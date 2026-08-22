@@ -222,13 +222,13 @@
             <table class="cyber-table cyber-table-slim">
               <thead>
                 <tr>
-                  <th>STREAM_ID // TENANT</th>
-                  <th>INPUT PROTOCOL & SOURCE ENDPOINT</th>
-                  <th>RES SCORE</th>
-                  <th>NETWORK FLOW</th>
-                  <th>DECODE LATENCY</th>
-                  <th>CONSUMERS & SAMPLING GOVERNOR</th>
-                  <th>TRANSPORT</th>
+                  <th style="color: var(--cb-cyan);">[01] STREAM_ID // TENANT</th>
+                  <th style="color: var(--cb-cyan);">[01] INPUT PROTOCOL & SOURCE ENDPOINT</th>
+                  <th style="color: var(--cb-cyan);">[01] NETWORK FLOW</th>
+                  <th style="color: var(--cb-cyan);">[01] DECODE LATENCY</th>
+                  <th style="color: var(--cb-yellow);">[02] RES SCORE</th>
+                  <th style="color: var(--cb-yellow);">[02] CONSUMERS & SAMPLING GOVERNOR</th>
+                  <th style="color: var(--cb-green);">[03] TRANSPORT</th>
                   <th>STATUS</th>
                 </tr>
               </thead>
@@ -270,51 +270,49 @@
         <button onclick="closeDrawer()" style="background: none; border: none; color: var(--cb-magenta); font-size: 1.6rem; cursor: pointer; font-weight: bold;">✕</button>
       </div>
 
-      <!-- Live Network Flow & Hardware Metrics -->
-      <h4 style="color: var(--cb-cyan); margin-bottom: 0.75rem;">// 01. INGESTION NETWORK FLOW & HARDWARE METRICS</h4>
+      <!-- Section 01: Ingestion Media Source Parameters & Network Flow (Cyan Theme) -->
+      <h4 style="color: var(--cb-cyan); margin-bottom: 0.75rem; border-left: 3px solid var(--cb-cyan); padding-left: 0.5rem;">// 01. INGESTION MEDIA SOURCE PARAMETERS & NETWORK FLOW</h4>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.5rem;">
-        <div class="cyber-metric-pill cyber-cut-tr">
-          <span class="text-hud" style="color: var(--cb-text-muted);">INBOUND NETWORK FLOW</span>
-          <div id="drawerNetKbps" class="text-mono" style="font-size: 1.25rem; color: var(--cb-yellow); font-weight: bold; margin-top: 0.2rem;">4,850.5 Kbps</div>
-          <span class="text-mono" style="color: var(--cb-green); font-size: 0.75rem;">● RTSP STABLE PASS-THROUGH</span>
+        <div class="cyber-metric-pill cyber-cut-tr" style="border-left: 2px solid var(--cb-cyan);">
+          <span class="text-hud" style="color: var(--cb-cyan);">INBOUND NETWORK FLOW</span>
+          <div id="drawerNetKbps" class="text-mono" style="font-size: 1.25rem; color: var(--cb-cyan); font-weight: bold; margin-top: 0.2rem;">4,850.5 Kbps</div>
+          <span class="text-mono" style="color: var(--cb-cyan); font-size: 0.75rem;">● RTSP STABLE PASS-THROUGH</span>
         </div>
 
-        <div class="cyber-metric-pill cyber-cut-tr">
-          <span class="text-hud" style="color: var(--cb-text-muted);">DECODE LATENCY (Δt)</span>
+        <div class="cyber-metric-pill cyber-cut-tr" style="border-left: 2px solid var(--cb-cyan);">
+          <span class="text-hud" style="color: var(--cb-cyan);">DECODE LATENCY (Δt)</span>
           <div id="drawerLatency" class="text-mono" style="font-size: 1.25rem; color: var(--cb-cyan); font-weight: bold; margin-top: 0.2rem;">1.42 ms</div>
           <span class="text-mono" style="color: var(--cb-cyan); font-size: 0.75rem;">NVDEC ZERO-COPY VRAM</span>
         </div>
 
-        <div class="cyber-metric-pill cyber-cut-tr">
-          <span class="text-hud" style="color: var(--cb-text-muted);">CPU RESOURCE LOAD</span>
-          <div id="drawerCpu" class="text-mono" style="font-size: 1.25rem; color: var(--cb-text-main); font-weight: bold; margin-top: 0.2rem;">3.2 %</div>
-          <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.75rem;">SERVER-SIDE PROCESS</span>
+        <div class="cyber-metric-pill cyber-cut-tr" style="border-left: 2px solid var(--cb-cyan);">
+          <span class="text-hud" style="color: var(--cb-cyan);">CPU RESOURCE LOAD</span>
+          <div id="drawerCpu" class="text-mono" style="font-size: 1.25rem; color: var(--cb-cyan); font-weight: bold; margin-top: 0.2rem;">3.2 %</div>
+          <span class="text-mono" style="color: var(--cb-cyan); font-size: 0.75rem;">SERVER-SIDE PROCESS</span>
         </div>
 
-        <div class="cyber-metric-pill cyber-cut-tr">
-          <span class="text-hud" style="color: var(--cb-text-muted);">GPU VRAM OCCUPANCY</span>
-          <div id="drawerGpu" class="text-mono" style="font-size: 1.25rem; color: var(--cb-magenta); font-weight: bold; margin-top: 0.2rem;">128.5 MB</div>
-          <span class="text-mono" style="color: var(--cb-magenta); font-size: 0.75rem;">CUDA IPC ALLOCATED</span>
+        <div class="cyber-metric-pill cyber-cut-tr" style="border-left: 2px solid var(--cb-cyan);">
+          <span class="text-hud" style="color: var(--cb-cyan);">GPU VRAM OCCUPANCY</span>
+          <div id="drawerGpu" class="text-mono" style="font-size: 1.25rem; color: var(--cb-cyan); font-weight: bold; margin-top: 0.2rem;">128.5 MB</div>
+          <span class="text-mono" style="color: var(--cb-cyan); font-size: 0.75rem;">CUDA IPC ALLOCATED</span>
         </div>
       </div>
 
-      <!-- Ingestion Source Endpoint -->
-      <h4 style="color: var(--cb-yellow); margin-bottom: 0.75rem;">// 02. SOURCE MEDIA ENDPOINT</h4>
       <div style="margin-bottom: 1.5rem;">
-        <label class="cyber-label">// SOURCE URL / PATH</label>
-        <input type="text" id="drawerSourceUrl" class="cyber-input" readonly>
+        <label class="cyber-label" style="color: var(--cb-cyan);">// SOURCE MEDIA ENDPOINT / PATH</label>
+        <input type="text" id="drawerSourceUrl" class="cyber-input" style="border-color: var(--cb-cyan); color: var(--cb-cyan);" readonly>
       </div>
 
-      <!-- Server-Side Sampling Rate Governor Sliders -->
-      <h4 style="color: var(--cb-yellow); margin-bottom: 0.75rem;">// 03. SERVER-SIDE SAMPLING RATE GOVERNOR</h4>
+      <!-- Section 02: Server-Side Sampling Governor & Pipeline (Yellow Theme) -->
+      <h4 style="color: var(--cb-yellow); margin-bottom: 0.75rem; border-left: 3px solid var(--cb-yellow); padding-left: 0.5rem;">// 02. SERVER-SIDE SAMPLING GOVERNOR & PIPELINE</h4>
       <p class="text-mono" style="font-size: 0.8rem; color: var(--cb-text-muted); margin-bottom: 1rem;">
-        Adjust server-side frame sampling rate per consumer (Camera source stream remains 100% untouched).
+        Configure consumer sampling rates and RAM/VRAM zero-copy transport modes via PATCH API (Camera remains untouched).
       </p>
 
-      <div style="margin-bottom: 1rem; background-color: var(--cb-bg-elevated); padding: 0.85rem;" class="cyber-cut-tr">
+      <div style="margin-bottom: 1rem; background-color: var(--cb-bg-elevated); border-left: 2px solid var(--cb-yellow); padding: 0.85rem;" class="cyber-cut-tr">
         <div style="display: flex; align-items: center; justify-content: space-between;">
-          <span class="text-mono" style="color: var(--cb-cyan); font-weight: bold;">CONSUMER: YOLOv8_DETECTOR</span>
-          <span class="badge-protocol" style="font-size: 0.65rem;">shm_numpy</span>
+          <span class="text-mono" style="color: var(--cb-yellow); font-weight: bold;">CONSUMER: YOLOv8_DETECTOR</span>
+          <span class="badge-protocol mp4" style="font-size: 0.65rem;">shm_numpy</span>
         </div>
         <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.75rem;">
           <span class="text-mono" style="color: var(--cb-text-muted);">SAMPLING RATE: <strong id="drawerFpsValYolo" style="color: var(--cb-yellow);">5 FPS</strong></span>
@@ -322,9 +320,9 @@
         </div>
       </div>
 
-      <div style="margin-bottom: 1.5rem; background-color: var(--cb-bg-elevated); padding: 0.85rem;" class="cyber-cut-tr">
+      <div style="margin-bottom: 1.5rem; background-color: var(--cb-bg-elevated); border-left: 2px solid var(--cb-yellow); padding: 0.85rem;" class="cyber-cut-tr">
         <div style="display: flex; align-items: center; justify-content: space-between;">
-          <span class="text-mono" style="color: var(--cb-cyan); font-weight: bold;">CONSUMER: LPR_OCR_READER</span>
+          <span class="text-mono" style="color: var(--cb-yellow); font-weight: bold;">CONSUMER: LPR_OCR_READER</span>
           <span class="badge-protocol mp4" style="font-size: 0.65rem;">cuda_ipc_tensor</span>
         </div>
         <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.75rem;">
@@ -333,7 +331,7 @@
         </div>
       </div>
 
-      <button class="cyber-btn cyber-btn-primary" style="width: 100%; margin-top: 0.5rem;" onclick="applyDrawerThrottle()">APPLY PARAMETERS (PATCH API)</button>
+      <button class="cyber-btn" style="width: 100%; margin-top: 0.5rem; background-color: var(--cb-yellow); color: #000; border-color: var(--cb-yellow); font-weight: 800;" onclick="applyDrawerThrottle()">APPLY PARAMETERS (PATCH API)</button>
 
     </div>
   </div>
@@ -593,23 +591,23 @@
           <tr onclick="openStreamDrawer('${st.stream_id}')" title="Click to inspect Media Source Parameters & Pipeline Metrics">
             <td>
               <div style="font-weight: bold; color: var(--cb-cyan); font-family: var(--font-heading);">${st.stream_id.toUpperCase()}</div>
-              <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.75rem;">${st.tenant_id}</span>
+              <span class="text-mono" style="color: var(--cb-cyan); opacity: 0.8; font-size: 0.75rem;">${st.tenant_id}</span>
             </td>
             <td>
               ${protocolBadge}
-              <div class="text-mono" style="color: var(--cb-text-main); font-size: 0.8rem; margin-top: 0.2rem;">${st.source_url}</div>
+              <div class="text-mono" style="color: var(--cb-cyan); font-size: 0.8rem; margin-top: 0.2rem;">${st.source_url}</div>
             </td>
             <td>
-              <span class="text-mono" style="color: var(--cb-magenta); font-weight: bold;">${resScoreFormatted} pts</span>
-            </td>
-            <td>
-              <span class="text-mono" style="color: var(--cb-yellow);">${netFlowFormatted}</span>
+              <span class="text-mono" style="color: var(--cb-cyan); font-weight: bold;">${netFlowFormatted}</span>
             </td>
             <td>
               <span class="text-mono" style="color: var(--cb-cyan); font-weight: bold;">${st.latency || '1.42 ms'}</span>
             </td>
             <td>
-              <span class="text-mono" style="color: var(--cb-text-main); font-size: 0.8rem;">${consumersText}</span>
+              <span class="text-mono" style="color: var(--cb-yellow); font-weight: bold;">${resScoreFormatted} pts</span>
+            </td>
+            <td>
+              <span class="text-mono" style="color: var(--cb-yellow); font-size: 0.8rem;">${consumersText}</span>
             </td>
             <td>
               <span class="text-mono" style="color: var(--cb-green); font-size: 0.75rem;">${st.transport || 'POSIX SHM'}</span>
