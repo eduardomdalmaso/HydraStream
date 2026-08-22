@@ -96,12 +96,12 @@
         <span class="text-hud text-mono" style="color: var(--cb-cyan);">// v1.0.0 HUD ACTIVE</span>
       </div>
 
-      <nav>
-        <a href="#" class="cyber-nav-item active">[ 01 ] CONTROL PANEL</a>
-        <a href="#" class="cyber-nav-item">[ 02 ] STREAM MATRIX</a>
-        <a href="#" class="cyber-nav-item">[ 03 ] CHAOS LAB STUDIO</a>
-        <a href="#" class="cyber-nav-item">[ 04 ] CLUSTER TOPOLOGY</a>
-        <a href="#" class="cyber-nav-item">[ 05 ] TELEMETRY LOGS</a>
+      <nav id="cyberNav">
+        <a href="#control-panel" class="cyber-nav-item active">[ 01 ] CONTROL PANEL</a>
+        <a href="#stream-matrix" class="cyber-nav-item">[ 02 ] STREAM MATRIX</a>
+        <a href="#chaos-lab" class="cyber-nav-item">[ 03 ] CHAOS LAB STUDIO</a>
+        <a href="#cluster-topology" class="cyber-nav-item">[ 04 ] CLUSTER TOPOLOGY</a>
+        <a href="#telemetry-logs" class="cyber-nav-item">[ 05 ] TELEMETRY LOGS</a>
       </nav>
 
       <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--cb-border-dim);">
@@ -281,10 +281,29 @@
       }
     }
 
-    // Initialize on page load
+    function updateHashRoute() {
+      const hash = window.location.hash || '#control-panel';
+      const navLinks = document.querySelectorAll('#cyberNav a');
+      
+      navLinks.forEach(link => {
+        if (link.getAttribute('href') === hash) {
+          link.classList.add('active');
+        } else {
+          link.classList.remove('active');
+        }
+      });
+    }
+
+    // Initialize on page load and location hash change
     window.addEventListener('DOMContentLoaded', () => {
+      if (!window.location.hash) {
+        window.location.hash = '#control-panel';
+      }
+      updateHashRoute();
       loadStreams();
     });
+
+    window.addEventListener('hashchange', updateHashRoute);
   </script>
 
 </body>
