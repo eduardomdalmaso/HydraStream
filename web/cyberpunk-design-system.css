@@ -311,11 +311,96 @@ h3, .text-h3 {
   box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
 }
 
-.cyber-label {
-  display: block;
-  margin-bottom: 0.35rem;
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
-  color: var(--cb-yellow);
-  text-transform: uppercase;
+/* Cyberpunk HUD Tab Filters */
+.cyber-tab-group {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid var(--cb-border-dim);
+  padding-bottom: 0.5rem;
 }
+
+.cyber-tab-btn {
+  padding: 0.5rem 1.25rem;
+  font-family: var(--font-display);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background-color: var(--cb-bg-surface);
+  color: var(--cb-text-muted);
+  border: 1px solid var(--cb-border-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+
+.cyber-tab-btn:hover {
+  color: var(--cb-cyan);
+  border-color: var(--cb-cyan);
+}
+
+.cyber-tab-btn.active {
+  background-color: var(--cb-yellow);
+  color: var(--cb-text-inverse);
+  border-color: var(--cb-yellow);
+  box-shadow: 0 0 12px rgba(252, 238, 10, 0.4);
+}
+
+/* Cyberpunk Telemetry Data Table */
+.cyber-table-container {
+  background-color: var(--cb-bg-surface);
+  border: 1px solid var(--cb-border-dim);
+  border-left: 3px solid var(--cb-cyan);
+  overflow-x: auto;
+}
+
+.cyber-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.cyber-table th {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cb-yellow);
+  background-color: var(--cb-bg-elevated);
+  padding: 0.85rem 1rem;
+  border-bottom: 2px solid var(--cb-cyan);
+}
+
+.cyber-table td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--cb-border-dim);
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+  color: var(--cb-text-main);
+}
+
+.cyber-table tr:hover {
+  background-color: rgba(0, 240, 255, 0.03);
+}
+
+.badge-protocol {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #000;
+  background-color: var(--cb-cyan);
+}
+
+.badge-protocol.mp4 {
+  background-color: var(--cb-yellow);
+}
+
+.badge-protocol.imageseq {
+  background-color: var(--cb-magenta);
+  color: #fff;
+}
+
