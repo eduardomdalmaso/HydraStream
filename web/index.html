@@ -198,26 +198,26 @@
         <button onclick="closeModal()" style="background: none; border: none; color: var(--cb-magenta); font-size: 1.5rem; cursor: pointer; font-weight: bold;">✕</button>
       </div>
 
-      <form onsubmit="event.preventDefault(); alert('Stream registered in HydraStream!'); closeModal();">
+      <form onsubmit="submitStreamForm(event)">
         
         <div style="margin-bottom: 1rem;">
           <label class="cyber-label">// TENANT_ID</label>
-          <input type="text" class="cyber-input" value="tenant_company_alpha" readonly>
+          <input type="text" id="inputTenant" class="cyber-input" value="tenant_company_alpha" readonly>
         </div>
 
         <div style="margin-bottom: 1rem;">
           <label class="cyber-label">// STREAM_ID_NAME</label>
-          <input type="text" class="cyber-input" placeholder="e.g. cam_gate_02" required>
+          <input type="text" id="inputStreamId" class="cyber-input" placeholder="e.g. cam_gate_02" required>
         </div>
 
         <div style="margin-bottom: 1rem;">
           <label class="cyber-label">// RTSP_SOURCE_URL</label>
-          <input type="url" class="cyber-input" placeholder="rtsp://admin:pass@192.168.1.50:554/stream1" required>
+          <input type="url" id="inputSourceUrl" class="cyber-input" placeholder="rtsp://admin:pass@192.168.1.50:554/stream1" required>
         </div>
 
         <div style="margin-bottom: 1.5rem;">
           <label class="cyber-label">// TARGET_ANALYTIC_FPS</label>
-          <input type="number" class="cyber-input" value="15" min="1" max="60">
+          <input type="number" id="inputFps" class="cyber-input" value="15" min="1" max="60">
         </div>
 
         <div style="display: flex; justify-content: flex-end; gap: 1rem;">
@@ -229,8 +229,6 @@
 
     </div>
   </div>
-
-  <script>
     function toggleTheme() {
       const html = document.documentElement;
       const current = html.getAttribute('data-theme');
@@ -244,6 +242,88 @@
     function closeModal() {
       document.getElementById('registerModal').style.display = 'none';
     }
+
+    async function loadStreams() {
+      try {
+        const res = await fetch('/api/v1/streams');
+        if (!res.ok) return;
+        const streams = await res.json();
+        renderStreams(streams);
+      } catch (e) {
+        console.log('Using static preview data');
+      }
+    }
+
+    function renderStreams(streams) {
+      const grid = document.querySelector('.camera-grid');
+      if (!streams || streams.length === 0) {
+        grid.innerHTML = '<div class="text-mono" style="color: var(--cb-text-muted);">// NO ACTIVE STREAMS REGISTERED</div>';
+        return;
+      }
+      grid.innerHTML = streams.map(st => `
+        <div class="camera-card cyber-cut-tr">
+          <div class="camera-header">
+            <span class="text-hud" style="color: var(--cb-cyan);">${st.stream_id.toUpperCase()}</span>
+            <span class="status-badge">${st.ingest_fps || 30} FPS // ${st.status ? st.status.toUpperCase() : 'ONLINE'}</span>
+          </div>
+          <div class="camera-preview">
+            <img src="/api/v1/streams/${st.stream_id}/mjpeg?fps=5" alt="Camera Stream Preview" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://placehold.co/600x400/0e1017/00f0ff?text=HYDRASTREAM+LIVE+FEED';">
+          </div>
+          <div style="padding: 0.75rem 1rem; background-color: var(--cb-bg-surface);">
+            <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.8rem;">
+              ENGINE: ${st.decoding_engine ? st.decoding_engine.toUpperCase() : 'NVDEC'} | CONSUMERS: ${(st.consumers || []).length}
+            </span>
+          </div>
+        </div>
+      `).join('');
+
+      // Update Active Feeds metric
+      const feedsCount = document.querySelector('.metric-value');
+      if (feedsCount) feedsCount.innerText = `${streams.length} / ${streams.length}`;
+    }
+
+    async function submitStreamForm(e) {
+      e.preventDefault();
+      const tenantId = document.getElementById('inputTenant').value;
+      const streamId = document.getElementById('inputStreamId').value;
+      const sourceUrl = document.getElementById('inputSourceUrl').value;
+      const targetFps = parseFloat(document.getElementById('inputFps').value) || 15;
+
+      const payload = {
+        tenant_id: tenantId,
+        stream_id: streamId,
+        source_url: sourceUrl,
+        decoding_engine: "nvidia_nvdec",
+        consumers: [
+          {
+            analytic_type: "yolo_detector",
+            target_fps: targetFps,
+            output_format: "shm_numpy"
+          }
+        ]
+      };
+
+      try {
+        const res = await fetch('/api/v1/streams', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          closeModal();
+          loadStreams();
+        } else {
+          alert('Failed to register stream');
+        }
+      } catch (err) {
+        alert('Error connecting to backend API');
+      }
+    }
+
+    // Initialize on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      loadStreams();
+    });
   </script>
 
 </body>
