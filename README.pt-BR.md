@@ -24,8 +24,9 @@ Em sistemas de visão computacional em grande escala, rodar múltiplos analític
 
 ## A Solução
 
-O **HydraStream** atua como um multiplexador de vídeo centralizado e motor de memória (*um único feed de câmera alimentando múltiplos analíticos com cadências controladas*):
+O **HydraStream** atua como um multiplexador de vídeo Headless centralizado e motor de memória (*um único feed de câmera alimentando múltiplos analíticos com cadências controladas*):
 
+- **Engine Headless Orientada a API:** O HydraStream não armazena cadastro de usuários ou câmeras de forma nativa. Em vez disso, ele expõe uma API REST/gRPC limpa (`POST /api/v1/streams`) projetada para ser controlada por plataformas terceiras, VMSs ou portais de clientes.
 - **Arquitetura Dual-Engine Modular:**
   - **Módulo CPU:** Usa Go/Rust + FFmpeg para alta taxa de processamento em nós puramente CPU.
   - **Módulo GPU (NVIDIA):** Usa NVDEC + CUDA IPC + NVIDIA Triton Inference Server para aceleração por hardware e passagem de tensores zero-copy na VRAM da GPU.

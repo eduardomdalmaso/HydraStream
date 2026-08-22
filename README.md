@@ -24,8 +24,9 @@ In scaled computer vision and video analytics pipelines, running multiple downst
 
 ## The Solution
 
-**HydraStream** acts as a centralized, ultra-efficient stream multiplexer and frame engine (*one stream feed, multiple throttled analytics heads*):
+**HydraStream** acts as a centralized, ultra-efficient headless stream multiplexer and frame engine (*one stream feed, multiple throttled analytics heads*):
 
+- **Pure Headless API & Engine:** HydraStream does not manage camera user databases natively. Instead, it exposes a clean REST/gRPC API (`POST /api/v1/streams`) designed to be driven by external third-party applications, VMS platforms, or client portals.
 - **Modular Dual-Engine Architecture:**
   - **CPU Module:** Uses Go/Rust + FFmpeg for high-throughput software decoding on CPU nodes.
   - **GPU Module (NVIDIA):** Uses NVDEC + CUDA IPC + NVIDIA Triton Inference Server for hardware acceleration and zero-copy tensor passing directly on GPU memory.
