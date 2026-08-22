@@ -2,6 +2,8 @@
 
 > **High-performance, zero-overhead frame fan-out & decoding pipeline for computer vision and Triton analytics in Go & Rust.**
 
+[ **English** ] | [ **Português do Brasil** ](README.pt-BR.md)
+
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![Rust](https://img.shields.io/badge/Rust-1.75+-000000?logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -63,6 +65,18 @@ flowchart TD
         GovGPU -->|CUDA IPC Tensor @ 30 FPS| Triton[NVIDIA Triton Inference Server]
     end
 ```
+
+---
+
+## Why HydraStream vs. NVIDIA DeepStream
+
+| Feature | NVIDIA DeepStream | HydraStream |
+| :--- | :--- | :--- |
+| **Docker Image Size** | Heavy (12 GB to 20 GB) | Ultra-lightweight (< 80 MB CPU / ~500 MB GPU) |
+| **Hardware Support** | NVIDIA GPUs Only (Vendor Lock-in) | Hybrid Universal (CPU, Intel OpenVINO, AMD, NVIDIA GPU) |
+| **Development Complexity** | Complex C/GStreamer plugin pipeline | Simple Python SDK, NumPy, OpenCV, and REST API |
+| **Kubernetes Pod Startup** | Slow (minutes to pull 15 GB image) | Instant (< 3 seconds image pull & startup) |
+| **Memory Footprint** | Heavy GStreamer memory graphs | Lock-free Rust POSIX Shared Memory Zero-Copy |
 
 ---
 
