@@ -123,13 +123,13 @@ func ServeSwaggerUI(w http.ResponseWriter, r *http.Request) {
   <meta charset="UTF-8">
   <title>HydraStream API // Cyberpunk 2077 Swagger UI</title>
   <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Orbitron:wght@800&family=Share+Tech+Mono&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@600;700&family=Orbitron:wght@800&family=Share+Tech+Mono&display=swap">
   <style>
     body {
       margin: 0;
       padding: 0;
       background-color: #07080c !important;
-      font-family: 'Chakra Petch', sans-serif !important;
+      font-family: 'Barlow', sans-serif !important;
       color: #f0f2f5 !important;
       background-image: 
         linear-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 1px),

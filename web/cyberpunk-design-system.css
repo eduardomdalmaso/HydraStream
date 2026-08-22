@@ -2,13 +2,13 @@
    HYDRASTREAM - CYBERPUNK 2077 HUD DESIGN SYSTEM (CSS SPECIFICATION)
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Orbitron:wght@600;800;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@600;700;800&family=Orbitron:wght@700;800;900&family=Share+Tech+Mono&family=Teko:wght@600;700&display=swap');
 
 :root {
   /* Fonts */
-  --font-display: 'Orbitron', 'Chakra Petch', sans-serif;
-  --font-heading: 'Chakra Petch', 'Rajdhani', sans-serif;
-  --font-body: 'Rajdhani', sans-serif;
+  --font-display: 'Orbitron', 'Teko', sans-serif;
+  --font-heading: 'Teko', 'Barlow', sans-serif;
+  --font-body: 'Barlow', sans-serif;
   --font-mono: 'Share Tech Mono', monospace;
 
   /* Dark Theme Palette (Default Cyberpunk Dark) */
