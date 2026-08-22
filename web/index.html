@@ -230,9 +230,9 @@
 
             <!-- Right: Real-time Consumer Throttle Controls -->
             <div style="background-color: var(--cb-bg-surface); border: 1px solid var(--cb-border-dim); padding: 1rem;" class="cyber-cut-tr">
-              <span class="text-hud" style="color: var(--cb-yellow);">// DYNAMIC FPS GOVERNOR TUNER</span>
+              <span class="text-hud" style="color: var(--cb-yellow);">// SERVER-SIDE SAMPLING GOVERNOR</span>
               <p class="text-mono" style="font-size: 0.8rem; color: var(--cb-text-muted); margin-top: 0.5rem; margin-bottom: 1rem;">
-                Adjust target sampling rate per consumer on the fly via PATCH /api/v1/streams/{id}/consumers/{type}
+                Adjust server-side frame sampling rate per consumer (Camera source stream remains 100% untouched).
               </p>
 
               <div style="margin-bottom: 1.25rem;">
