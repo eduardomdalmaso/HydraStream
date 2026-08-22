@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -86,8 +87,8 @@ func (s *StreamStore) GetStream(streamID string) (*model.Stream, bool) {
 	return st, ok
 }
 
-// ListStreamsFiltered returns registered streams with server-side O(1) indexed search, tenant filtering, and pagination.
-func (s *StreamStore) ListStreamsFiltered(searchQuery, tenantFilter string, page, limit int) ([]*model.Stream, int) {
+// ListStreamsFiltered returns registered streams sorted by resource consumption with server-side O(1) indexed search, tenant filtering, and pagination.
+func (s *StreamStore) ListStreamsFiltered(searchQuery, tenantFilter, sortBy string, page, limit int) ([]*model.Stream, int) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -96,6 +97,11 @@ func (s *StreamStore) ListStreamsFiltered(searchQuery, tenantFilter string, page
 
 	var filtered []*model.Stream
 	for _, st := range s.streams {
+		// Calculate synthetic resource score for sorting
+		if st.ResourceScore == 0 {
+			st.ResourceScore = (st.CPULoadPercent * 2.0) + (st.GPUMemoryMB / 10.0) + (st.NetworkKbps / 1000.0)
+		}
+
 		// Tenant filter
 		if tenantFilter != "" && strings.ToLower(st.TenantID) != tenantFilter {
 			continue
@@ -111,6 +117,20 @@ func (s *StreamStore) ListStreamsFiltered(searchQuery, tenantFilter string, page
 		}
 		filtered = append(filtered, st)
 	}
+
+	// Sort by Resource Consumption Descending by default
+	sort.Slice(filtered, func(i, j int) bool {
+		switch sortBy {
+		case "latency_desc":
+			return filtered[i].DecodeLatency > filtered[j].DecodeLatency
+		case "fps_desc":
+			return filtered[i].IngestFPS > filtered[j].IngestFPS
+		case "stream_id_asc":
+			return filtered[i].StreamID < filtered[j].StreamID
+		default: // "resource_desc"
+			return filtered[i].ResourceScore > filtered[j].ResourceScore
+		}
+	})
 
 	total := len(filtered)
 	if page < 1 {
@@ -135,7 +155,7 @@ func (s *StreamStore) ListStreamsFiltered(searchQuery, tenantFilter string, page
 
 // ListStreams returns all registered streams.
 func (s *StreamStore) ListStreams() []*model.Stream {
-	streams, _ := s.ListStreamsFiltered("", "", 1, 1000)
+	streams, _ := s.ListStreamsFiltered("", "", "resource_desc", 1, 1000)
 	return streams
 }
 

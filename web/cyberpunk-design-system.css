@@ -524,10 +524,64 @@ h3, .text-h3 {
   align-items: center;
 }
 
-.cyber-combobox-item:hover {
-  background-color: var(--cb-cyan);
-  color: #000;
+/* Ultra-Slim High-Density Table Rows */
+.cyber-table-slim th {
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.725rem !important;
 }
+
+.cyber-table-slim td {
+  padding: 0.4rem 0.75rem !important;
+  font-size: 0.8125rem !important;
+}
+
+.cyber-table-slim tr {
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.cyber-table-slim tr:hover {
+  background-color: rgba(0, 240, 255, 0.08) !important;
+}
+
+/* Cyberpunk Slide-out Inspection Drawer */
+.cyber-drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(7, 8, 12, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 10000;
+  display: none;
+  justify-content: flex-end;
+}
+
+.cyber-drawer {
+  width: 580px;
+  max-width: 90vw;
+  height: 100vh;
+  background-color: var(--cb-bg-surface);
+  border-left: 3px solid var(--cb-yellow);
+  box-shadow: -10px 0 30px rgba(0, 240, 255, 0.25);
+  padding: 2rem;
+  overflow-y: auto;
+  animation: cyber-drawer-slide 0.25s ease-out;
+}
+
+@keyframes cyber-drawer-slide {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.cyber-metric-pill {
+  background: var(--cb-bg-elevated);
+  border: 1px solid var(--cb-border-dim);
+  padding: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
 
 
 

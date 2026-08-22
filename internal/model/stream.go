@@ -23,6 +23,11 @@ type Stream struct {
 	Resolution     string     `json:"resolution"`
 	Codec          string     `json:"codec"`
 	IngestFPS      float64    `json:"ingest_fps"`
+	NetworkKbps    float64    `json:"network_kbps"`
+	CPULoadPercent float64    `json:"cpu_load_percent"`
+	GPUMemoryMB    float64    `json:"gpu_memory_mb"`
+	DecodeLatency  float64    `json:"decode_latency_ms"`
+	ResourceScore  float64    `json:"resource_score"`
 	Consumers      []Consumer `json:"consumers"`
 	CreatedAt      time.Time  `json:"created_at"`
 }

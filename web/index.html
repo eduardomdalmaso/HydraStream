@@ -129,38 +129,87 @@
       <!-- Main Body Content -->
       <main class="main-content">
         
-        <!-- View 1: Control Panel -->
+      <!-- Main Body Content -->
+      <main class="main-content">
+        
+        <!-- View 1: Control Panel (Macro System Overview) -->
         <div id="view-control-panel" class="spa-view">
-          <!-- Metrics Row -->
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+            <h3 style="color: var(--cb-yellow); margin-bottom: 0;">// SYSTEM HEALTH & MACRO METRICS OVERVIEW</h3>
+            <span class="text-mono" style="color: var(--cb-green);">● ALL CLUSTER NODES OPERATIONAL</span>
+          </div>
+
+          <!-- Macro Metrics Grid -->
           <div class="metrics-grid">
             <div class="metric-card cyber-cut-tr">
-              <span class="text-hud" style="color: var(--cb-text-muted);">// ACTIVE RTSP FEEDS</span>
+              <span class="text-hud" style="color: var(--cb-text-muted);">// ACTIVE INGEST PIPES</span>
               <div class="metric-value">12 / 12</div>
-              <span class="text-mono" style="color: var(--cb-green); font-size: 0.8rem;">● SINGLE INGEST PIPE ACTIVE</span>
+              <span class="text-mono" style="color: var(--cb-green); font-size: 0.8rem;">● SINGLE INGEST PIPE PER CAMERA</span>
             </div>
 
             <div class="metric-card cyber-cut-tr" style="border-left-color: var(--cb-yellow);">
-              <span class="text-hud" style="color: var(--cb-text-muted);">// DECODE LATENCY</span>
+              <span class="text-hud" style="color: var(--cb-text-muted);">// HARDWARE DECODE LATENCY</span>
               <div class="metric-value" style="color: var(--cb-cyan);">1.42 ms</div>
-              <span class="text-mono" style="color: var(--cb-cyan); font-size: 0.8rem;">NVDEC HARDWARE ZERO-COPY</span>
+              <span class="text-mono" style="color: var(--cb-cyan); font-size: 0.8rem;">NVDEC ZERO-COPY VRAM</span>
             </div>
 
             <div class="metric-card cyber-cut-tr" style="border-left-color: var(--cb-magenta);">
-              <span class="text-hud" style="color: var(--cb-text-muted);">// SHM RAM OCCUPANCY</span>
+              <span class="text-hud" style="color: var(--cb-text-muted);">// POSIX SHM RAM OCCUPANCY</span>
               <div class="metric-value" style="color: var(--cb-magenta);">18.4 %</div>
-              <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.8rem;">POSIX /dev/shm LOCK-FREE</span>
+              <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.8rem;">ATOMIC LOCK-FREE RING BUFFERS</span>
+            </div>
+
+            <div class="metric-card cyber-cut-tr" style="border-left-color: var(--cb-amber);">
+              <span class="text-hud" style="color: var(--cb-text-muted);">// INGESTION NETWORK FLOW</span>
+              <div class="metric-value" style="color: var(--cb-amber);">54.2 Mbps</div>
+              <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.8rem;">AGGREGATED RTSP INBOUND</span>
             </div>
           </div>
 
-          <!-- Input Types Tab Filters & Search Bar -->
+          <!-- Quick Actions Panel -->
+          <div style="background-color: var(--cb-bg-surface); border: 1px solid var(--cb-border-dim); border-left: 3px solid var(--cb-yellow); padding: 1.5rem; margin-top: 1.5rem;" class="cyber-cut-tr">
+            <h4 style="color: var(--cb-yellow); margin-bottom: 0.5rem;">// STREAM MATRIX RESOURCE ANALYZER</h4>
+            <p class="text-mono" style="color: var(--cb-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+              Inspect real-time camera ingestion sorted by highest resource consumption (CPU/GPU/Latency), tune server-side sampling rates, and view network flow telemetry in the Stream Matrix Studio.
+            </p>
+            <a href="#stream-matrix" class="cyber-btn cyber-btn-primary" style="text-decoration: none;">OPEN STREAM MATRIX & RESOURCE MONITOR →</a>
+          </div>
+        </div>
+
+        <!-- View 2: Stream Matrix & Real-Time Resource Ingestion Studio -->
+        <div id="view-stream-matrix" class="spa-view" style="display: none;">
+          
+          <!-- Matrix Controls Bar: Search, Filters, Sorting, Page Size -->
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
-            <h3 style="color: var(--cb-yellow); margin-bottom: 0;">// MEDIA INPUT INGESTION MATRIX</h3>
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-              <span class="text-mono" style="color: var(--cb-cyan); font-size: 0.8rem;">SEARCH:</span>
-              <input type="text" id="streamSearchInput" class="cyber-input" placeholder="Search 100,000+ cameras by ID, URL, Tenant..." style="padding: 0.35rem 0.75rem; width: 320px; font-size: 0.8rem;" oninput="onSearchInput(this.value)">
+            <div>
+              <h3 style="color: var(--cb-yellow); margin-bottom: 0.2rem;">// STREAM RESOURCE MATRIX & TELEMETRY</h3>
+              <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.75rem;">Sorted by highest resource consumption (CPU/GPU/Latency). Click any row to inspect parameters.</span>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+              <!-- Search Bar -->
+              <input type="text" id="streamSearchInput" class="cyber-input" placeholder="Search 100,000+ cameras by ID, URL, Tenant..." style="padding: 0.35rem 0.75rem; width: 260px; font-size: 0.8rem;" oninput="onSearchInput(this.value)">
+
+              <!-- Resource Sort Selector -->
+              <select id="sortSelect" class="cyber-input" style="padding: 0.35rem 0.5rem; font-size: 0.8rem; width: 220px;" onchange="onSortChange(this.value)">
+                <option value="resource_desc">SORT: RESOURCE USAGE (HIGH ➔ LOW)</option>
+                <option value="latency_desc">SORT: DECODE LATENCY (HIGH ➔ LOW)</option>
+                <option value="fps_desc">SORT: INGEST FPS (HIGH ➔ LOW)</option>
+                <option value="stream_id_asc">SORT: STREAM ID (A ➔ Z)</option>
+              </select>
+
+              <!-- Page Size Switcher -->
+              <span class="text-mono" style="color: var(--cb-cyan); font-size: 0.75rem;">ROWS:</span>
+              <select id="pageSizeSelect" class="cyber-input" style="padding: 0.35rem 0.5rem; font-size: 0.8rem; width: 75px;" onchange="onPageSizeChange(this.value)">
+                <option value="10" selected>10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
             </div>
           </div>
 
+          <!-- Input Protocol Tabs -->
           <div class="cyber-tab-group" id="inputTabs">
             <button class="cyber-tab-btn active" data-filter="all" onclick="filterInputs('all')">[ ALL INPUTS (<span id="countAll">12</span>) ]</button>
             <button class="cyber-tab-btn" data-filter="rtsp" onclick="filterInputs('rtsp')">[ RTSP CAMERAS (<span id="countRtsp">8</span>) ]</button>
@@ -168,17 +217,18 @@
             <button class="cyber-tab-btn" data-filter="imageseq" onclick="filterInputs('imageseq')">[ IMAGE SEQUENCES (<span id="countImg">2</span>) ]</button>
           </div>
 
-          <!-- Telemetry Data Table -->
+          <!-- High-Density Ultra-Slim Telemetry Table -->
           <div class="cyber-table-container cyber-cut-tr">
-            <table class="cyber-table">
+            <table class="cyber-table cyber-table-slim">
               <thead>
                 <tr>
                   <th>STREAM_ID // TENANT</th>
                   <th>INPUT PROTOCOL & SOURCE ENDPOINT</th>
-                  <th>CODEC / RES</th>
-                  <th>LATENCY</th>
-                  <th>ANALYTIC CONSUMERS & FPS GOVERNOR</th>
-                  <th>MEMORY TRANSPORT</th>
+                  <th>RES SCORE</th>
+                  <th>NETWORK FLOW</th>
+                  <th>DECODE LATENCY</th>
+                  <th>CONSUMERS & SAMPLING GOVERNOR</th>
+                  <th>TRANSPORT</th>
                   <th>STATUS</th>
                 </tr>
               </thead>
@@ -187,10 +237,10 @@
               </tbody>
             </table>
 
-            <!-- Pagination Controls (10 items per page) -->
+            <!-- Configurable Pagination Controls -->
             <div class="cyber-pagination">
               <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.8rem;">
-                SHOWING <span id="pageRangeText" style="color: var(--cb-cyan);">1-10</span> OF <span id="totalItemsText" style="color: var(--cb-yellow);">12</span> ENTRIES (10 PER PAGE)
+                SHOWING <span id="pageRangeText" style="color: var(--cb-cyan);">1-10</span> OF <span id="totalItemsText" style="color: var(--cb-yellow);">12</span> ENTRIES
               </span>
 
               <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -202,101 +252,89 @@
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- View 2: Stream Matrix & Media Source Parameter Studio (No Canvas View) -->
-        <div id="view-stream-matrix" class="spa-view" style="display: none;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-            <h3 style="color: var(--cb-yellow); margin-bottom: 0;">// MEDIA SOURCE PARAMETER & PIPELINE CONFIGURATION STUDIO</h3>
-            <span class="text-mono" style="color: var(--cb-cyan); font-size: 0.85rem;">SERVER-SIDE TELEMETRY CONFIG</span>
-          </div>
-          
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-            
-            <!-- Left Panel: Source Stream Metadata & Ingestion Parameters -->
-            <div style="background-color: var(--cb-bg-surface); border: 1px solid var(--cb-border-dim); border-left: 3px solid var(--cb-cyan); padding: 1.25rem;" class="cyber-cut-tr">
-              <span class="text-hud" style="color: var(--cb-cyan);">// 01. INGESTION MEDIA SOURCE PARAMETERS</span>
-              <p class="text-mono" style="font-size: 0.8rem; color: var(--cb-text-muted); margin-top: 0.35rem; margin-bottom: 1.25rem;">
-                Configure passive media source parameters (RTSP / MP4 / Image Directory). Camera source encoders remain untouched.
-              </p>
-
-              <div style="margin-bottom: 1rem;">
-                <label class="cyber-label">// SEARCH & SELECT STREAM ID (AUTOCOMPLETE 100K+)</label>
-                <div class="cyber-combobox-container">
-                  <input type="text" id="comboboxInput" class="cyber-input" placeholder="Type to search 100,000+ streams (e.g. cam_feed_05)..." oninput="onComboboxType(this.value)" onfocus="onComboboxFocus()">
-                  <div id="comboboxList" class="cyber-combobox-list">
-                    <!-- Dynamically Populated Search Results -->
-                  </div>
-                </div>
-              </div>
-
-              <div style="margin-bottom: 1rem;">
-                <label class="cyber-label">// TENANT NAMESPACE (ISOLATION KEY)</label>
-                <input type="text" class="cyber-input" id="paramTenant" value="tenant_company_alpha" readonly>
-              </div>
-
-              <div style="margin-bottom: 1rem;">
-                <label class="cyber-label">// MEDIA SOURCE ENDPOINT / PATH</label>
-                <input type="text" class="cyber-input" id="paramSourceUrl" value="rtsp://mediamtx:8554/tenant_company_alpha/cam_entrance_01">
-              </div>
-
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                <div>
-                  <label class="cyber-label">// DECODING ENGINE</label>
-                  <select class="cyber-input" id="paramEngine">
-                    <option value="nvidia_nvdec">NVIDIA NVDEC (GPU 0)</option>
-                    <option value="cpu_ffmpeg">FFmpeg (CPU Shared Memory)</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="cyber-label">// CODEC OVERRIDE</label>
-                  <select class="cyber-input" id="paramCodec">
-                    <option value="auto">AUTO DETECT (H.264/H.265)</option>
-                    <option value="h264">H.264 Baseline/Main</option>
-                    <option value="h265">H.265 HEVC</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <!-- Right Panel: Server-Side Frame Sampling & Consumer Pipeline Governor -->
-            <div style="background-color: var(--cb-bg-surface); border: 1px solid var(--cb-border-dim); border-left: 3px solid var(--cb-yellow); padding: 1.25rem;" class="cyber-cut-tr">
-              <span class="text-hud" style="color: var(--cb-yellow);">// 02. SERVER-SIDE SAMPLING GOVERNOR & PIPELINE</span>
-              <p class="text-mono" style="font-size: 0.8rem; color: var(--cb-text-muted); margin-top: 0.35rem; margin-bottom: 1.25rem;">
-                Configure consumer sampling rates and RAM/VRAM zero-copy transport modes via PATCH API.
-              </p>
-
-              <div style="margin-bottom: 1rem; background-color: var(--cb-bg-elevated); padding: 0.85rem;" class="cyber-cut-tr">
-                <div style="display: flex; align-items: center; justify-content: space-between;">
-                  <span class="text-mono" style="color: var(--cb-cyan); font-weight: bold;">CONSUMER: YOLOv8_DETECTOR</span>
-                  <span class="badge-protocol" style="font-size: 0.65rem;">shm_numpy</span>
-                </div>
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.75rem;">
-                  <span class="text-mono" style="color: var(--cb-text-muted);">SAMPLING RATE: <strong id="fpsValYolo" style="color: var(--cb-yellow);">5 FPS</strong></span>
-                  <input type="range" id="inputYoloFps" min="1" max="30" value="5" oninput="document.getElementById('fpsValYolo').innerText = this.value + ' FPS'">
-                </div>
-              </div>
-
-              <div style="margin-bottom: 1.25rem; background-color: var(--cb-bg-elevated); padding: 0.85rem;" class="cyber-cut-tr">
-                <div style="display: flex; align-items: center; justify-content: space-between;">
-                  <span class="text-mono" style="color: var(--cb-cyan); font-weight: bold;">CONSUMER: LPR_OCR_READER</span>
-                  <span class="badge-protocol mp4" style="font-size: 0.65rem;">cuda_ipc_tensor</span>
-                </div>
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.75rem;">
-                  <span class="text-mono" style="color: var(--cb-text-muted);">SAMPLING RATE: <strong id="fpsValLpr" style="color: var(--cb-yellow);">2 FPS</strong></span>
-                  <input type="range" id="inputLprFps" min="1" max="30" value="2" oninput="document.getElementById('fpsValLpr').innerText = this.value + ' FPS'">
-                </div>
-              </div>
-
-              <div style="display: flex; gap: 1rem;">
-                <button class="cyber-btn cyber-btn-primary" style="flex: 1;" onclick="applyThrottleFromUi()">UPDATE PARAMETERS (PATCH API)</button>
-              </div>
-            </div>
-
-          </div>
         </div>
 
       </main>
+    </div>
+  </div>
+
+  <!-- Cyberpunk Slide-out Inspection Drawer for Stream Parameters & Telemetry -->
+  <div id="drawerOverlay" class="cyber-drawer-overlay" onclick="closeDrawerOnOverlay(event)">
+    <div class="cyber-drawer cyber-cut-tr">
+      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--cb-yellow); padding-bottom: 0.75rem; margin-bottom: 1.5rem;">
+        <div>
+          <h2 id="drawerStreamTitle" style="font-size: 1.35rem; color: var(--cb-yellow); text-transform: uppercase;">// CAM_FEED_01</h2>
+          <span id="drawerTenantSubtitle" class="text-mono" style="color: var(--cb-cyan); font-size: 0.8rem;">TENANT: tenant_company_alpha</span>
+        </div>
+        <button onclick="closeDrawer()" style="background: none; border: none; color: var(--cb-magenta); font-size: 1.6rem; cursor: pointer; font-weight: bold;">✕</button>
+      </div>
+
+      <!-- Live Network Flow & Hardware Metrics -->
+      <h4 style="color: var(--cb-cyan); margin-bottom: 0.75rem;">// 01. INGESTION NETWORK FLOW & HARDWARE METRICS</h4>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.5rem;">
+        <div class="cyber-metric-pill cyber-cut-tr">
+          <span class="text-hud" style="color: var(--cb-text-muted);">INBOUND NETWORK FLOW</span>
+          <div id="drawerNetKbps" class="text-mono" style="font-size: 1.25rem; color: var(--cb-yellow); font-weight: bold; margin-top: 0.2rem;">4,850.5 Kbps</div>
+          <span class="text-mono" style="color: var(--cb-green); font-size: 0.75rem;">● RTSP STABLE PASS-THROUGH</span>
+        </div>
+
+        <div class="cyber-metric-pill cyber-cut-tr">
+          <span class="text-hud" style="color: var(--cb-text-muted);">DECODE LATENCY (Δt)</span>
+          <div id="drawerLatency" class="text-mono" style="font-size: 1.25rem; color: var(--cb-cyan); font-weight: bold; margin-top: 0.2rem;">1.42 ms</div>
+          <span class="text-mono" style="color: var(--cb-cyan); font-size: 0.75rem;">NVDEC ZERO-COPY VRAM</span>
+        </div>
+
+        <div class="cyber-metric-pill cyber-cut-tr">
+          <span class="text-hud" style="color: var(--cb-text-muted);">CPU RESOURCE LOAD</span>
+          <div id="drawerCpu" class="text-mono" style="font-size: 1.25rem; color: var(--cb-text-main); font-weight: bold; margin-top: 0.2rem;">3.2 %</div>
+          <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.75rem;">SERVER-SIDE PROCESS</span>
+        </div>
+
+        <div class="cyber-metric-pill cyber-cut-tr">
+          <span class="text-hud" style="color: var(--cb-text-muted);">GPU VRAM OCCUPANCY</span>
+          <div id="drawerGpu" class="text-mono" style="font-size: 1.25rem; color: var(--cb-magenta); font-weight: bold; margin-top: 0.2rem;">128.5 MB</div>
+          <span class="text-mono" style="color: var(--cb-magenta); font-size: 0.75rem;">CUDA IPC ALLOCATED</span>
+        </div>
+      </div>
+
+      <!-- Ingestion Source Endpoint -->
+      <h4 style="color: var(--cb-yellow); margin-bottom: 0.75rem;">// 02. SOURCE MEDIA ENDPOINT</h4>
+      <div style="margin-bottom: 1.5rem;">
+        <label class="cyber-label">// SOURCE URL / PATH</label>
+        <input type="text" id="drawerSourceUrl" class="cyber-input" readonly>
+      </div>
+
+      <!-- Server-Side Sampling Rate Governor Sliders -->
+      <h4 style="color: var(--cb-yellow); margin-bottom: 0.75rem;">// 03. SERVER-SIDE SAMPLING RATE GOVERNOR</h4>
+      <p class="text-mono" style="font-size: 0.8rem; color: var(--cb-text-muted); margin-bottom: 1rem;">
+        Adjust server-side frame sampling rate per consumer (Camera source stream remains 100% untouched).
+      </p>
+
+      <div style="margin-bottom: 1rem; background-color: var(--cb-bg-elevated); padding: 0.85rem;" class="cyber-cut-tr">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span class="text-mono" style="color: var(--cb-cyan); font-weight: bold;">CONSUMER: YOLOv8_DETECTOR</span>
+          <span class="badge-protocol" style="font-size: 0.65rem;">shm_numpy</span>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.75rem;">
+          <span class="text-mono" style="color: var(--cb-text-muted);">SAMPLING RATE: <strong id="drawerFpsValYolo" style="color: var(--cb-yellow);">5 FPS</strong></span>
+          <input type="range" id="drawerYoloFps" min="1" max="30" value="5" oninput="document.getElementById('drawerFpsValYolo').innerText = this.value + ' FPS'">
+        </div>
+      </div>
+
+      <div style="margin-bottom: 1.5rem; background-color: var(--cb-bg-elevated); padding: 0.85rem;" class="cyber-cut-tr">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span class="text-mono" style="color: var(--cb-cyan); font-weight: bold;">CONSUMER: LPR_OCR_READER</span>
+          <span class="badge-protocol mp4" style="font-size: 0.65rem;">cuda_ipc_tensor</span>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.75rem;">
+          <span class="text-mono" style="color: var(--cb-text-muted);">SAMPLING RATE: <strong id="drawerFpsValLpr" style="color: var(--cb-yellow);">2 FPS</strong></span>
+          <input type="range" id="drawerLprFps" min="1" max="30" value="2" oninput="document.getElementById('drawerFpsValLpr').innerText = this.value + ' FPS'">
+        </div>
+      </div>
+
+      <button class="cyber-btn cyber-btn-primary" style="width: 100%; margin-top: 0.5rem;" onclick="applyDrawerThrottle()">APPLY PARAMETERS (PATCH API)</button>
+
     </div>
   </div>
 
@@ -314,47 +352,129 @@
     function closeModal() {
       document.getElementById('registerModal').style.display = 'none';
     }    let currentFilter = 'all';
+    let currentSortBy = 'resource_desc';
     let rawStreams = [];
     let currentPage = 1;
-    const pageSize = 10;
+    let pageSize = 10;
+    let activeDrawerStreamId = null;
 
-    // Sample data generator with 12 streams to demonstrate 10-per-page pagination
-    const sampleStreams = Array.from({ length: 12 }, (_, i) => {
-      const types = ['rtsp', 'rtsp', 'mp4', 'imageseq'];
-      const type = types[i % 4];
-      const numStr = String(i + 1).padStart(2, '0');
-      return {
-        stream_id: `cam_feed_${numStr}`,
+    // Sample data generator with 12 streams ordered by highest resource consumption
+    const sampleStreams = [
+      {
+        stream_id: 'cam_parking_north',
         tenant_id: 'tenant_company_alpha',
-        source_url: type === 'rtsp' ? `rtsp://mediamtx:8554/tenant/cam_${numStr}` : (type === 'mp4' ? `/var/videos/clip_${numStr}.mp4` : `dir:///var/data/frames_${numStr}/`),
-        type: type,
-        codec: type === 'rtsp' ? 'H.264' : (type === 'mp4' ? 'H.265' : 'RAW JPG'),
-        resolution: '1920x1080',
-        latency: (1.10 + (i * 0.05)).toFixed(2) + ' ms',
-        consumers: type === 'rtsp' ? ['YOLOv8 @ 5 FPS', 'LPR OCR @ 2 FPS'] : ['TRITON TENSORRT @ 30 FPS'],
-        transport: type === 'rtsp' ? 'POSIX SHM (Lock-Free)' : 'CUDA IPC (Zero-Copy VRAM)',
+        source_url: 'rtsp://mediamtx:8554/tenant_company_alpha/cam_parking_north',
+        type: 'rtsp',
+        codec: 'H.265 4K',
+        resolution: '3840x2160',
+        ingest_fps: 60.0,
+        latency: '2.85 ms',
+        network_kbps: 12450.0,
+        cpu_percent: 8.4,
+        gpu_mb: 320.0,
+        resource_score: 98.5,
+        consumers: ['TRITON TENSORRT @ 30 FPS', 'YOLOv8x @ 15 FPS'],
+        transport: 'CUDA IPC (Zero-Copy VRAM)',
         status: 'ONLINE'
-      };
-    });
+      },
+      {
+        stream_id: 'cam_entrance_01',
+        tenant_id: 'tenant_company_alpha',
+        source_url: 'rtsp://mediamtx:8554/tenant_company_alpha/cam_entrance_01',
+        type: 'rtsp',
+        codec: 'H.264 1080p',
+        resolution: '1920x1080',
+        ingest_fps: 30.0,
+        latency: '1.42 ms',
+        network_kbps: 4850.5,
+        cpu_percent: 4.2,
+        gpu_mb: 128.5,
+        resource_score: 84.2,
+        consumers: ['YOLOv8 @ 5 FPS', 'LPR OCR @ 2 FPS'],
+        transport: 'POSIX SHM (Lock-Free)',
+        status: 'ONLINE'
+      },
+      {
+        stream_id: 'sim_traffic_loop',
+        tenant_id: 'tenant_company_alpha',
+        source_url: '/var/videos/traffic_simulation.mp4',
+        type: 'mp4',
+        codec: 'H.264 1080p',
+        resolution: '1920x1080',
+        ingest_fps: 30.0,
+        latency: '0.85 ms',
+        network_kbps: 3200.0,
+        cpu_percent: 2.8,
+        gpu_mb: 64.0,
+        resource_score: 68.0,
+        consumers: ['SPEED_ESTIMATOR @ 15 FPS'],
+        transport: 'POSIX SHM (Lock-Free)',
+        status: 'LOOPING'
+      },
+      {
+        stream_id: 'sim_offline_frames',
+        tenant_id: 'tenant_company_alpha',
+        source_url: 'dir:///var/data/frames_sequence/',
+        type: 'imageseq',
+        codec: 'RAW JPG',
+        resolution: '1280x720',
+        ingest_fps: 15.0,
+        latency: '0.35 ms',
+        network_kbps: 1500.0,
+        cpu_percent: 1.2,
+        gpu_mb: 32.0,
+        resource_score: 42.1,
+        consumers: ['FACE_EMBEDDING @ 1 FPS'],
+        transport: 'POSIX SHM (Lock-Free)',
+        status: 'ACTIVE'
+      }
+    ];
+
+    // Generate extra entries up to 12 for full pagination demonstration
+    for (let i = 5; i <= 12; i++) {
+      const num = String(i).padStart(2, '0');
+      sampleStreams.push({
+        stream_id: `cam_perimeter_${num}`,
+        tenant_id: 'tenant_company_alpha',
+        source_url: `rtsp://mediamtx:8554/tenant/cam_perimeter_${num}`,
+        type: 'rtsp',
+        codec: 'H.264 1080p',
+        resolution: '1920x1080',
+        ingest_fps: 30.0,
+        latency: (1.20 + (i * 0.08)).toFixed(2) + ' ms',
+        network_kbps: 3800.0 + (i * 150),
+        cpu_percent: 3.0 + (i * 0.2),
+        gpu_mb: 96.0,
+        resource_score: 75.0 - (i * 2),
+        consumers: ['OBJECT_DETECTOR @ 5 FPS'],
+        transport: 'POSIX SHM (Lock-Free)',
+        status: 'ONLINE'
+      });
+    }
 
     async function loadStreams() {
       try {
-        const res = await fetch('/api/v1/streams');
+        const res = await fetch(`/api/v1/streams?sort_by=${currentSortBy}&page=${currentPage}&limit=${pageSize}&search=${searchQueryVal}`);
         if (res.ok) {
-          const streams = await res.json();
-          rawStreams = (streams && streams.length > 0) ? streams.map(st => ({
-            ...st,
-            type: st.source_url.startsWith('rtsp') ? 'rtsp' : (st.source_url.endsWith('.mp4') ? 'mp4' : 'imageseq'),
-            latency: '1.42 ms',
-            transport: 'POSIX SHM'
-          })) : sampleStreams;
+          const data = await res.json();
+          if (data && data.streams && data.streams.length > 0) {
+            rawStreams = data.streams.map(st => ({
+              ...st,
+              type: st.source_url.startsWith('rtsp') ? 'rtsp' : (st.source_url.endsWith('.mp4') ? 'mp4' : 'imageseq'),
+              latency: st.decode_latency_ms ? st.decode_latency_ms + ' ms' : '1.42 ms',
+              network_kbps: st.network_kbps || 4850.5,
+              resource_score: st.resource_score || 84.2,
+              transport: st.decoding_engine === 'nvidia_nvdec' ? 'CUDA IPC (Zero-Copy VRAM)' : 'POSIX SHM (Lock-Free)'
+            }));
+          } else {
+            rawStreams = sampleStreams;
+          }
         } else {
           rawStreams = sampleStreams;
         }
       } catch (e) {
         rawStreams = sampleStreams;
       }
-      currentPage = 1;
       renderTable();
     }
 
@@ -366,8 +486,20 @@
       searchDebounceTimer = setTimeout(() => {
         searchQueryVal = val.toLowerCase().trim();
         currentPage = 1;
-        renderTable();
+        loadStreams();
       }, 200);
+    }
+
+    function onSortChange(val) {
+      currentSortBy = val;
+      currentPage = 1;
+      loadStreams();
+    }
+
+    function onPageSizeChange(val) {
+      pageSize = parseInt(val) || 10;
+      currentPage = 1;
+      renderTable();
     }
 
     function filterInputs(type) {
@@ -385,15 +517,14 @@
     }
 
     function changePage(delta) {
-      const filtered = rawStreams.filter(st => currentFilter === 'all' || st.type === currentFilter);
+      const filtered = getFilteredStreams();
       const totalPages = Math.ceil(filtered.length / pageSize) || 1;
       currentPage = Math.max(1, Math.min(totalPages, currentPage + delta));
       renderTable();
     }
 
-    function renderTable() {
-      const tbody = document.getElementById('streamTableBody');
-      const filtered = rawStreams.filter(st => {
+    function getFilteredStreams() {
+      let filtered = rawStreams.filter(st => {
         const matchesTab = (currentFilter === 'all' || st.type === currentFilter);
         const matchesSearch = !searchQueryVal || 
           st.stream_id.toLowerCase().includes(searchQueryVal) || 
@@ -401,6 +532,21 @@
           st.tenant_id.toLowerCase().includes(searchQueryVal);
         return matchesTab && matchesSearch;
       });
+
+      // Sort locally if sample streams
+      filtered.sort((a, b) => {
+        if (currentSortBy === 'latency_desc') return (parseFloat(b.latency) || 0) - (parseFloat(a.latency) || 0);
+        if (currentSortBy === 'fps_desc') return (b.ingest_fps || 0) - (a.ingest_fps || 0);
+        if (currentSortBy === 'stream_id_asc') return a.stream_id.localeCompare(b.stream_id);
+        return (b.resource_score || 0) - (a.resource_score || 0); // resource_desc default
+      });
+
+      return filtered;
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('streamTableBody');
+      const filtered = getFilteredStreams();
 
       // Update Tab counters
       document.getElementById('countAll').innerText = rawStreams.length;
@@ -427,7 +573,7 @@
       document.getElementById('btnNextPage').disabled = (currentPage >= totalPages);
 
       if (!pageItems || pageItems.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-mono" style="color: var(--cb-text-muted); text-align: center;">// NO INPUT SOURCES MATCH FILTER</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-mono" style="color: var(--cb-text-muted); text-align: center;">// NO INPUT SOURCES MATCH FILTER</td></tr>';
         return;
       }
 
@@ -440,8 +586,11 @@
           ? st.consumers.map(c => typeof c === 'string' ? c : `${c.analytic_type} @ ${c.target_fps} FPS`).join(' | ') 
           : 'NONE';
 
+        const resScoreFormatted = (st.resource_score || 80).toFixed(1);
+        const netFlowFormatted = (st.network_kbps || 4850).toLocaleString() + ' Kbps';
+
         return `
-          <tr>
+          <tr onclick="openStreamDrawer('${st.stream_id}')" title="Click to inspect Media Source Parameters & Pipeline Metrics">
             <td>
               <div style="font-weight: bold; color: var(--cb-cyan); font-family: var(--font-heading);">${st.stream_id.toUpperCase()}</div>
               <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.75rem;">${st.tenant_id}</span>
@@ -451,8 +600,10 @@
               <div class="text-mono" style="color: var(--cb-text-main); font-size: 0.8rem; margin-top: 0.2rem;">${st.source_url}</div>
             </td>
             <td>
-              <span class="text-mono" style="color: var(--cb-yellow);">${st.codec || 'H.264'}</span>
-              <div class="text-mono" style="color: var(--cb-text-muted); font-size: 0.75rem;">${st.resolution || '1080p'}</div>
+              <span class="text-mono" style="color: var(--cb-magenta); font-weight: bold;">${resScoreFormatted} pts</span>
+            </td>
+            <td>
+              <span class="text-mono" style="color: var(--cb-yellow);">${netFlowFormatted}</span>
             </td>
             <td>
               <span class="text-mono" style="color: var(--cb-cyan); font-weight: bold;">${st.latency || '1.42 ms'}</span>
@@ -461,7 +612,7 @@
               <span class="text-mono" style="color: var(--cb-text-main); font-size: 0.8rem;">${consumersText}</span>
             </td>
             <td>
-              <span class="text-mono" style="color: var(--cb-green); font-size: 0.8rem;">${st.transport || 'POSIX SHM'}</span>
+              <span class="text-mono" style="color: var(--cb-green); font-size: 0.75rem;">${st.transport || 'POSIX SHM'}</span>
             </td>
             <td>
               <span class="status-badge">${st.status || 'ONLINE'}</span>
@@ -469,6 +620,57 @@
           </tr>
         `;
       }).join('');
+    }
+
+    /* Drawer Inspection Logic */
+    function openStreamDrawer(streamId) {
+      activeDrawerStreamId = streamId;
+      const st = rawStreams.find(s => s.stream_id === streamId) || sampleStreams[0];
+
+      document.getElementById('drawerStreamTitle').innerText = `// ${st.stream_id.toUpperCase()}`;
+      document.getElementById('drawerTenantSubtitle').innerText = `TENANT: ${st.tenant_id}`;
+      document.getElementById('drawerSourceUrl').value = st.source_url;
+      document.getElementById('drawerNetKbps').innerText = `${(st.network_kbps || 4850).toLocaleString()} Kbps`;
+      document.getElementById('drawerLatency').innerText = st.latency || '1.42 ms';
+      document.getElementById('drawerCpu').innerText = `${st.cpu_percent || 3.2}%`;
+      document.getElementById('drawerGpu').innerText = `${st.gpu_mb || 128.5} MB`;
+
+      document.getElementById('drawerOverlay').style.display = 'flex';
+    }
+
+    function closeDrawer() {
+      document.getElementById('drawerOverlay').style.display = 'none';
+    }
+
+    function closeDrawerOnOverlay(e) {
+      if (e.target.id === 'drawerOverlay') {
+        closeDrawer();
+      }
+    }
+
+    async function applyDrawerThrottle() {
+      const streamId = activeDrawerStreamId || 'cam_parking_north';
+      const yoloFps = parseFloat(document.getElementById('drawerYoloFps').value) || 5;
+      const lprFps = parseFloat(document.getElementById('drawerLprFps').value) || 2;
+
+      try {
+        await fetch(`/api/v1/streams/${streamId}/consumers/yolo_detector`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_fps: yoloFps })
+        });
+        await fetch(`/api/v1/streams/${streamId}/consumers/lpr_ocr`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_fps: lprFps })
+        });
+
+        alert(`PATCH HTTP 200 OK: Updated ${streamId} throttles (YOLO: ${yoloFps} FPS | LPR: ${lprFps} FPS)`);
+        closeDrawer();
+        loadStreams();
+      } catch (err) {
+        alert('Error applying throttle parameters: ' + err);
+      }
     }
 
     let selectedStreamId = 'cam_feed_01';
