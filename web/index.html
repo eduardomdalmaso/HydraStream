@@ -221,12 +221,13 @@
               </p>
 
               <div style="margin-bottom: 1rem;">
-                <label class="cyber-label">// SELECT ACTIVE STREAM ID</label>
-                <select class="cyber-input" id="tunerStreamSelect" onchange="onStreamParamSelect(this.value)">
-                  <option value="cam_entrance_01">CAM_ENTRANCE_01 (tenant_company_alpha)</option>
-                  <option value="cam_parking_north">CAM_PARKING_NORTH (tenant_company_alpha)</option>
-                  <option value="sim_traffic_loop">SIM_TRAFFIC_LOOP (tenant_company_alpha)</option>
-                </select>
+                <label class="cyber-label">// SEARCH & SELECT STREAM ID (AUTOCOMPLETE 100K+)</label>
+                <div class="cyber-combobox-container">
+                  <input type="text" id="comboboxInput" class="cyber-input" placeholder="Type to search 100,000+ streams (e.g. cam_feed_05)..." oninput="onComboboxType(this.value)" onfocus="onComboboxFocus()">
+                  <div id="comboboxList" class="cyber-combobox-list">
+                    <!-- Dynamically Populated Search Results -->
+                  </div>
+                </div>
               </div>
 
               <div style="margin-bottom: 1rem;">
@@ -470,16 +471,67 @@
       }).join('');
     }
 
-    function onStreamParamSelect(streamId) {
+    let selectedStreamId = 'cam_feed_01';
+
+    function onComboboxFocus() {
+      renderComboboxResults(document.getElementById('comboboxInput').value);
+      document.getElementById('comboboxList').style.display = 'block';
+    }
+
+    function onComboboxType(val) {
+      renderComboboxResults(val);
+      document.getElementById('comboboxList').style.display = 'block';
+    }
+
+    function renderComboboxResults(query) {
+      const list = document.getElementById('comboboxList');
+      query = (query || '').toLowerCase().trim();
+
+      const matches = rawStreams.filter(st => 
+        !query || 
+        st.stream_id.toLowerCase().includes(query) || 
+        st.source_url.toLowerCase().includes(query) || 
+        st.tenant_id.toLowerCase().includes(query)
+      ).slice(0, 10);
+
+      if (matches.length === 0) {
+        list.innerHTML = '<div style="padding: 0.65rem; color: var(--cb-text-muted); font-size: 0.8rem;">// NO STREAMS FOUND</div>';
+        return;
+      }
+
+      list.innerHTML = matches.map(st => `
+        <div class="cyber-combobox-item" onclick="selectComboboxItem('${st.stream_id}')">
+          <div>
+            <strong style="color: var(--cb-cyan);">${st.stream_id.toUpperCase()}</strong>
+            <div style="font-size: 0.75rem; color: var(--cb-text-muted);">${st.source_url}</div>
+          </div>
+          <span class="badge-protocol" style="font-size: 0.65rem;">${st.type ? st.type.toUpperCase() : 'RTSP'}</span>
+        </div>
+      `).join('');
+    }
+
+    function selectComboboxItem(streamId) {
+      selectedStreamId = streamId;
       const stream = rawStreams.find(s => s.stream_id === streamId);
       if (stream) {
+        document.getElementById('comboboxInput').value = `${stream.stream_id.toUpperCase()} (${stream.tenant_id})`;
         document.getElementById('paramTenant').value = stream.tenant_id || 'tenant_company_alpha';
         document.getElementById('paramSourceUrl').value = stream.source_url || '';
       }
+      document.getElementById('comboboxList').style.display = 'none';
     }
 
+    // Close combobox when clicking outside
+    document.addEventListener('click', (e) => {
+      const combo = document.querySelector('.cyber-combobox-container');
+      if (combo && !combo.contains(e.target)) {
+        const list = document.getElementById('comboboxList');
+        if (list) list.style.display = 'none';
+      }
+    });
+
     async function applyThrottleFromUi() {
-      const streamId = document.getElementById('tunerStreamSelect').value;
+      const streamId = selectedStreamId || 'cam_feed_01';
       const yoloFps = parseFloat(document.getElementById('inputYoloFps').value) || 5;
       const lprFps = parseFloat(document.getElementById('inputLprFps').value) || 2;
 

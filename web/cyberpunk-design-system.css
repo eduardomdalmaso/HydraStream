@@ -492,10 +492,42 @@ h3, .text-h3 {
     font-size: 0.8rem;
   }
 
-  .cyber-pagination {
-    flex-direction: column;
-    gap: 0.75rem;
-  }
+/* Cyberpunk Searchable Combobox Dropdown */
+.cyber-combobox-container {
+  position: relative;
+  width: 100%;
 }
+
+.cyber-combobox-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  max-height: 220px;
+  overflow-y: auto;
+  background-color: var(--cb-bg-elevated);
+  border: 1px solid var(--cb-cyan);
+  box-shadow: 0 4px 15px rgba(0, 240, 255, 0.3);
+  z-index: 99;
+  display: none;
+}
+
+.cyber-combobox-item {
+  padding: 0.65rem 0.85rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--cb-text-main);
+  border-bottom: 1px solid var(--cb-border-dim);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cyber-combobox-item:hover {
+  background-color: var(--cb-cyan);
+  color: #000;
+}
+
 
 
