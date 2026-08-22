@@ -110,6 +110,9 @@ flowchart TD
 
 HydraStream includes a high-performance **REST & gRPC Management API** allowing users and orchestrators (e.g. Kubernetes controllers) to dynamically configure streams, adjust target FPS per analytic, and select output delivery modes on the fly.
 
+- **Interactive Swagger UI Documentation:** `http://localhost:8080/swagger/`
+- **OpenAPI 3.0 Specification:** `http://localhost:8080/swagger/doc.json`
+
 ### 1. Register Stream & Configure Consumer Pipeline (`POST /api/v1/streams`)
 
 Supports **Multi-Tenancy Isolation** with `tenant_id` namespacing across POSIX SHM, MediaMTX paths, Redis keys, and Prometheus metrics:

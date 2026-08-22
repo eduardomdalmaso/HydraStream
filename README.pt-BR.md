@@ -110,6 +110,9 @@ flowchart TD
 
 O HydraStream inclui uma **API REST & gRPC de Alta Performance** permitindo que usuários e orquestradores (controllers Kubernetes) configurem streams dinamicamente, ajustem o FPS por analítico e escolham os formatos de saída em tempo real.
 
+- **Documentação Interativa Swagger UI:** `http://localhost:8080/swagger/`
+- **Especificação OpenAPI 3.0:** `http://localhost:8080/swagger/doc.json`
+
 ### 1. Cadastrar Stream & Configurar Pipeline (`POST /api/v1/streams`)
 
 Suporta **Isolamento Multi-Tenant** com namespaces por `tenant_id` na memória SHM, rotas MediaMTX, chaves Redis e métricas Prometheus:
