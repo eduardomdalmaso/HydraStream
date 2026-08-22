@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HydraStream // Cyberpunk 2077 HUD Control Panel</title>
+  <link rel="stylesheet" href="cyberpunk-design-system.css">
+  <style>
+    /* Page Specific Grid Layouts */
+    .cyber-header {
+      background-color: var(--cb-bg-surface);
+      border-bottom: 1px solid var(--cb-border-dim);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .main-content {
+      flex: 1;
+      padding: 2rem;
+      overflow-y: auto;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .metric-card {
+      background-color: var(--cb-bg-surface);
+      border: 1px solid var(--cb-border-dim);
+      border-left: 3px solid var(--cb-cyan);
+      padding: 1.25rem;
+    }
+
+    .metric-value {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--cb-yellow);
+    }
+
+    .camera-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .camera-card {
+      background-color: var(--cb-bg-surface);
+      border: 1px solid var(--cb-border-dim);
+      overflow: hidden;
+    }
+
+    .camera-header {
+      background-color: var(--cb-bg-elevated);
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--cb-border-dim);
+    }
+
+    .camera-preview {
+      width: 100%;
+      height: 230px;
+      background-color: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: bold;
+      color: #000;
+      background-color: var(--cb-green);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cyber-layout">
+    
+    <!-- Cyberpunk Sidebar -->
+    <aside class="cyber-sidebar">
+      <div style="margin-bottom: 2rem;">
+        <h2 style="color: var(--cb-yellow); font-size: 1.4rem;">HYDRASTREAM</h2>
+        <span class="text-hud text-mono" style="color: var(--cb-cyan);">// v1.0.0 HUD ACTIVE</span>
+      </div>
+
+      <nav>
+        <a href="#" class="cyber-nav-item active">[ 01 ] CONTROL PANEL</a>
+        <a href="#" class="cyber-nav-item">[ 02 ] STREAM MATRIX</a>
+        <a href="#" class="cyber-nav-item">[ 03 ] CHAOS LAB STUDIO</a>
+        <a href="#" class="cyber-nav-item">[ 04 ] CLUSTER TOPOLOGY</a>
+        <a href="#" class="cyber-nav-item">[ 05 ] TELEMETRY LOGS</a>
+      </nav>
+
+      <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--cb-border-dim);">
+        <span class="text-hud text-mono" style="color: var(--cb-text-muted);">DECODER ENGINE:</span>
+        <div class="text-mono" style="color: var(--cb-green); font-weight: bold;">NVIDIA NVDEC (GPU 0)</div>
+      </div>
+    </aside>
+
+    <!-- Main Section -->
+    <div style="flex: 1; display: flex; flex-direction: column;">
+      
+      <!-- Top Header -->
+      <header class="cyber-header">
+        <div>
+          <h1 style="font-size: 1.5rem; color: var(--cb-text-main);">LIVE ANALYTICS COMMAND CENTER</h1>
+          <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.85rem;">TENANT: tenant_company_alpha</span>
+        </div>
+
+        <div style="display: flex; gap: 1rem; align-items: center;">
+          <button class="cyber-btn cyber-btn-secondary" onclick="toggleTheme()">TOGGLE THEME</button>
+          <button class="cyber-btn cyber-btn-primary" onclick="openModal()">+ REGISTER CAMERA</button>
+        </div>
+      </header>
+
+      <!-- Main Body Content -->
+      <main class="main-content">
+        
+        <!-- Metrics Row -->
+        <div class="metrics-grid">
+          <div class="metric-card cyber-cut-tr">
+            <span class="text-hud" style="color: var(--cb-text-muted);">// ACTIVE RTSP FEEDS</span>
+            <div class="metric-value">12 / 12</div>
+            <span class="text-mono" style="color: var(--cb-green); font-size: 0.8rem;">● SINGLE INGEST PIPE ACTIVE</span>
+          </div>
+
+          <div class="metric-card cyber-cut-tr" style="border-left-color: var(--cb-yellow);">
+            <span class="text-hud" style="color: var(--cb-text-muted);">// DECODE LATENCY</span>
+            <div class="metric-value" style="color: var(--cb-cyan);">1.42 ms</div>
+            <span class="text-mono" style="color: var(--cb-cyan); font-size: 0.8rem;">NVDEC HARDWARE ZERO-COPY</span>
+          </div>
+
+          <div class="metric-card cyber-cut-tr" style="border-left-color: var(--cb-magenta);">
+            <span class="text-hud" style="color: var(--cb-text-muted);">// SHM RAM OCCUPANCY</span>
+            <div class="metric-value" style="color: var(--cb-magenta);">18.4 %</div>
+            <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.8rem;">POSIX /dev/shm LOCK-FREE</span>
+          </div>
+        </div>
+
+        <!-- Camera Streams Grid -->
+        <h3 style="margin-bottom: 1rem; color: var(--cb-yellow);">// ACTIVE CAMERA STREAMS</h3>
+
+        <div class="camera-grid">
+          
+          <!-- Camera Card 1 -->
+          <div class="camera-card cyber-cut-tr">
+            <div class="camera-header">
+              <span class="text-hud" style="color: var(--cb-cyan);">CAM_ENTRANCE_01</span>
+              <span class="status-badge">30 FPS // ONLINE</span>
+            </div>
+            <div class="camera-preview">
+              <img src="/api/v1/streams/cam_entrance_01/mjpeg?fps=5" alt="Camera Stream Preview" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://placehold.co/600x400/0e1017/00f0ff?text=HYDRASTREAM+MJPEG+FEED';">
+            </div>
+            <div style="padding: 0.75rem 1rem; background-color: var(--cb-bg-surface);">
+              <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.8rem;">ANALYTICS: YOLOv8 (5 FPS) | LPR OCR (2 FPS)</span>
+            </div>
+          </div>
+
+          <!-- Camera Card 2 -->
+          <div class="camera-card cyber-cut-tr">
+            <div class="camera-header">
+              <span class="text-hud" style="color: var(--cb-cyan);">CAM_PARKING_NORTH</span>
+              <span class="status-badge">30 FPS // ONLINE</span>
+            </div>
+            <div class="camera-preview">
+              <img src="/api/v1/streams/cam_parking_north/mjpeg?fps=5" alt="Camera Stream Preview" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://placehold.co/600x400/0e1017/fcee0a?text=HYDRASTREAM+MJPEG+FEED';">
+            </div>
+            <div style="padding: 0.75rem 1rem; background-color: var(--cb-bg-surface);">
+              <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.8rem;">ANALYTICS: TRITON TENSORRT (30 FPS)</span>
+            </div>
+          </div>
+
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Cyberpunk Stream Registration Modal -->
+  <div id="registerModal" class="cyber-modal-overlay" style="display: none;">
+    <div class="cyber-modal cyber-cut-modal glow-cyan">
+      
+      <div class="cyber-modal-header">
+        <h2 style="font-size: 1.25rem; color: var(--cb-yellow);">// REGISTER RTSP CAMERA STREAM</h2>
+        <button onclick="closeModal()" style="background: none; border: none; color: var(--cb-magenta); font-size: 1.5rem; cursor: pointer; font-weight: bold;">✕</button>
+      </div>
+
+      <form onsubmit="event.preventDefault(); alert('Stream registered in HydraStream!'); closeModal();">
+        
+        <div style="margin-bottom: 1rem;">
+          <label class="cyber-label">// TENANT_ID</label>
+          <input type="text" class="cyber-input" value="tenant_company_alpha" readonly>
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+          <label class="cyber-label">// STREAM_ID_NAME</label>
+          <input type="text" class="cyber-input" placeholder="e.g. cam_gate_02" required>
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+          <label class="cyber-label">// RTSP_SOURCE_URL</label>
+          <input type="url" class="cyber-input" placeholder="rtsp://admin:pass@192.168.1.50:554/stream1" required>
+        </div>
+
+        <div style="margin-bottom: 1.5rem;">
+          <label class="cyber-label">// TARGET_ANALYTIC_FPS</label>
+          <input type="number" class="cyber-input" value="15" min="1" max="60">
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 1rem;">
+          <button type="button" class="cyber-btn cyber-btn-secondary" onclick="closeModal()">CANCEL</button>
+          <button type="submit" class="cyber-btn cyber-btn-primary">INITIALIZE PIPELINE</button>
+        </div>
+
+      </form>
+
+    </div>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      const current = html.getAttribute('data-theme');
+      html.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+    }
+
+    function openModal() {
+      document.getElementById('registerModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('registerModal').style.display = 'none';
+    }
+  </script>
+
+</body>
+</html>

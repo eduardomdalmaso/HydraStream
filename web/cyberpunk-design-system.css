@@ -1,0 +1,270 @@
+/* ==========================================================================
+   HYDRASTREAM - CYBERPUNK 2077 HUD DESIGN SYSTEM (CSS SPECIFICATION)
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Orbitron:wght@600;800;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap');
+
+:root {
+  /* Fonts */
+  --font-display: 'Orbitron', 'Chakra Petch', sans-serif;
+  --font-heading: 'Chakra Petch', 'Rajdhani', sans-serif;
+  --font-body: 'Rajdhani', sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+
+  /* Dark Theme Palette (Default Cyberpunk Dark) */
+  --cb-bg-void: #07080c;
+  --cb-bg-surface: #0e1017;
+  --cb-bg-elevated: #161924;
+  --cb-border-dim: #232736;
+
+  /* Neon Accent Tokens */
+  --cb-cyan: #00f0ff;
+  --cb-yellow: #fcee0a;
+  --cb-magenta: #ff0055;
+  --cb-green: #00ff66;
+  --cb-amber: #ffaa00;
+  --cb-text-main: #f0f2f5;
+  --cb-text-muted: #8b94a7;
+  --cb-text-inverse: #07080c;
+
+  /* HUD Overlays */
+  --cb-grid-line: rgba(0, 240, 255, 0.04);
+}
+
+/* Light / High-Contrast Theme */
+[data-theme="light"] {
+  --cb-bg-void: #e6e9f0;
+  --cb-bg-surface: #ffffff;
+  --cb-bg-elevated: #f0f3fa;
+  --cb-border-dim: #cbd2e1;
+  --cb-text-main: #0a0b10;
+  --cb-text-muted: #5a6478;
+  --cb-text-inverse: #ffffff;
+  --cb-grid-line: rgba(10, 11, 16, 0.05);
+}
+
+/* Base Styles & Background Grid */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--cb-bg-void);
+  color: var(--cb-text-main);
+  font-family: var(--cb-font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-x: hidden;
+  background-image: 
+    linear-gradient(var(--cb-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--cb-grid-line) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+/* Typography Hierarchy */
+h1, .text-h1 {
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+h2, .text-h2 {
+  font-family: var(--font-display);
+  font-size: 1.875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h3, .text-h3 {
+  font-family: var(--font-heading);
+  font-size: 1.375rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.text-hud {
+  font-family: var(--font-heading);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.text-mono {
+  font-family: var(--font-mono);
+}
+
+/* Cyber Cuts & Corner Clippings */
+.cyber-cut-tr {
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+}
+
+.cyber-cut-modal {
+  clip-path: polygon(0 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 24px 100%, 0 calc(100% - 24px));
+}
+
+/* Glow Effects */
+.glow-cyan {
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.35);
+}
+
+.glow-yellow {
+  box-shadow: 0 0 15px rgba(252, 238, 10, 0.4);
+}
+
+/* Buttons */
+.cyber-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 1.4rem;
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  border: none;
+  outline: none;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+}
+
+.cyber-btn-primary {
+  background-color: var(--cb-yellow);
+  color: var(--cb-text-inverse);
+}
+
+.cyber-btn-primary:hover {
+  background-color: var(--cb-cyan);
+  color: var(--cb-text-inverse);
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
+}
+
+.cyber-btn-secondary {
+  background-color: transparent;
+  border: 2px solid var(--cb-cyan);
+  color: var(--cb-cyan);
+}
+
+.cyber-btn-secondary:hover {
+  background-color: var(--cb-cyan);
+  color: var(--cb-text-inverse);
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+}
+
+.cyber-btn-danger {
+  background-color: var(--cb-magenta);
+  color: #ffffff;
+}
+
+.cyber-btn-danger:hover {
+  box-shadow: 0 0 20px rgba(255, 0, 85, 0.7);
+}
+
+/* Layout Shell & Sidebar */
+.cyber-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.cyber-sidebar {
+  width: 260px;
+  background-color: var(--cb-bg-surface);
+  border-right: 1px solid var(--cb-border-dim);
+  border-left: 3px solid var(--cb-cyan);
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1rem;
+}
+
+.cyber-nav-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  font-family: var(--font-heading);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cb-text-muted);
+  text-decoration: none;
+  transition: all 0.15s ease;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+
+.cyber-nav-item:hover, .cyber-nav-item.active {
+  background-color: var(--cb-yellow);
+  color: var(--cb-text-inverse);
+  box-shadow: 0 0 12px rgba(252, 238, 10, 0.4);
+}
+
+/* Modals */
+.cyber-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(7, 8, 12, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.cyber-modal {
+  width: 540px;
+  background-color: var(--cb-bg-elevated);
+  border: 2px solid var(--cb-cyan);
+  padding: 2rem;
+  box-shadow: 0 0 30px rgba(0, 240, 255, 0.3);
+}
+
+.cyber-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--cb-yellow);
+}
+
+/* Inputs */
+.cyber-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background-color: var(--cb-bg-void);
+  border: 1px solid var(--cb-border-dim);
+  color: var(--cb-cyan);
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  outline: none;
+  transition: border 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cyber-input:focus {
+  border: 2px solid var(--cb-cyan);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+}
+
+.cyber-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--cb-yellow);
+  text-transform: uppercase;
+}
