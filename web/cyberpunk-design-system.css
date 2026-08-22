@@ -121,55 +121,106 @@ h3, .text-h3 {
   box-shadow: 0 0 15px rgba(252, 238, 10, 0.4);
 }
 
-/* Buttons */
+/* Cyberpunk 2077 Night City Glitch Buttons (Ref: jh3y/dev.to) */
 .cyber-btn {
+  --btn-bg: var(--cb-yellow);
+  --btn-color: var(--cb-text-inverse);
+  --btn-shadow: var(--cb-cyan);
+  --tag-bg: #000;
+  --tag-color: var(--cb-yellow);
+  
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.65rem 1.4rem;
+  padding: 0.75rem 2rem;
   font-family: var(--font-display);
-  font-size: 0.875rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  cursor: pointer;
-  transition: all 0.15s ease-in-out;
-  border: none;
+  color: var(--btn-color);
+  background-color: var(--btn-bg);
+  border: 0;
   outline: none;
-  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+  cursor: pointer;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  clip-path: polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 15px 100%, 0 calc(100% - 15px));
+  box-shadow: 4px 4px 0px var(--btn-shadow);
+}
+
+.cyber-btn::after {
+  content: 'HYDRA_v1';
+  position: absolute;
+  bottom: 2px;
+  right: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  font-weight: 800;
+  padding: 1px 4px;
+  background-color: var(--tag-bg);
+  color: var(--tag-color);
+  letter-spacing: 0.05em;
+  line-height: 1;
 }
 
 .cyber-btn-primary {
-  background-color: var(--cb-yellow);
-  color: var(--cb-text-inverse);
+  --btn-bg: var(--cb-yellow);
+  --btn-color: var(--cb-text-inverse);
+  --btn-shadow: var(--cb-cyan);
+  --tag-bg: #000;
+  --tag-color: var(--cb-yellow);
 }
 
 .cyber-btn-primary:hover {
-  background-color: var(--cb-cyan);
-  color: var(--cb-text-inverse);
-  box-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
+  --btn-bg: var(--cb-cyan);
+  --btn-color: var(--cb-text-inverse);
+  --btn-shadow: var(--cb-yellow);
+  --tag-bg: #000;
+  --tag-color: var(--cb-cyan);
+  animation: cyber-glitch 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  box-shadow: -4px 4px 15px rgba(0, 240, 255, 0.6);
 }
 
 .cyber-btn-secondary {
-  background-color: transparent;
-  border: 2px solid var(--cb-cyan);
-  color: var(--cb-cyan);
+  --btn-bg: var(--cb-bg-elevated);
+  --btn-color: var(--cb-cyan);
+  --btn-shadow: var(--cb-cyan);
+  --tag-bg: var(--cb-cyan);
+  --tag-color: #000;
+  border: 1px solid var(--cb-cyan);
 }
 
 .cyber-btn-secondary:hover {
-  background-color: var(--cb-cyan);
-  color: var(--cb-text-inverse);
+  --btn-bg: var(--cb-cyan);
+  --btn-color: #000;
+  --btn-shadow: var(--cb-yellow);
+  --tag-bg: #000;
+  --tag-color: var(--cb-cyan);
   box-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
 }
 
 .cyber-btn-danger {
-  background-color: var(--cb-magenta);
-  color: #ffffff;
+  --btn-bg: var(--cb-magenta);
+  --btn-color: #ffffff;
+  --btn-shadow: var(--cb-yellow);
+  --tag-bg: #000;
+  --tag-color: var(--cb-magenta);
 }
 
 .cyber-btn-danger:hover {
+  --btn-bg: #ff2a75;
   box-shadow: 0 0 20px rgba(255, 0, 85, 0.7);
+}
+
+/* Glitch Animation Keyframes */
+@keyframes cyber-glitch {
+  0% { transform: translate(0); }
+  20% { transform: translate(-2px, 2px); }
+  40% { transform: translate(-2px, -2px); }
+  60% { transform: translate(2px, 2px); }
+  80% { transform: translate(2px, -2px); }
+  100% { transform: translate(0); }
 }
 
 /* Layout Shell & Sidebar */
