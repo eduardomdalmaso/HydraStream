@@ -132,48 +132,158 @@
       <!-- Main Body Content -->
       <main class="main-content">
         
-        <!-- View 1: Control Panel (Macro System Overview) -->
+        <!-- View 1: Control Panel (Server Health, Cluster Status & Live Telemetry Charts) -->
         <div id="view-control-panel" class="spa-view">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
-            <h3 style="color: var(--cb-yellow); margin-bottom: 0;">// SYSTEM HEALTH & MACRO METRICS OVERVIEW</h3>
-            <span class="text-mono" style="color: var(--cb-green);">● ALL CLUSTER NODES OPERATIONAL</span>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+            <h3 style="color: var(--cb-yellow); margin-bottom: 0;">// SYSTEM HEALTH & CLUSTER TELEMETRY DASHBOARD</h3>
+            <span class="text-mono" style="color: var(--cb-green); font-weight: bold;">● HEALTHY (99.98% UPTIME SLA)</span>
           </div>
 
           <!-- Macro Metrics Grid -->
-          <div class="metrics-grid">
+          <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 1.5rem;">
             <div class="metric-card cyber-cut-tr">
-              <span class="text-hud" style="color: var(--cb-text-muted);">// ACTIVE INGEST PIPES</span>
-              <div class="metric-value">12 / 12</div>
-              <span class="text-mono" style="color: var(--cb-green); font-size: 0.8rem;">● SINGLE INGEST PIPE PER CAMERA</span>
+              <span class="text-hud" style="color: var(--cb-cyan);">// SERVER HEALTH INDEX</span>
+              <div class="metric-value" style="color: var(--cb-cyan);">99.98 %</div>
+              <span class="text-mono" style="color: var(--cb-green); font-size: 0.75rem;">● 0 DROPPED PIPES | 0 CRASHES</span>
             </div>
 
             <div class="metric-card cyber-cut-tr" style="border-left-color: var(--cb-yellow);">
-              <span class="text-hud" style="color: var(--cb-text-muted);">// HARDWARE DECODE LATENCY</span>
-              <div class="metric-value" style="color: var(--cb-cyan);">1.42 ms</div>
-              <span class="text-mono" style="color: var(--cb-cyan); font-size: 0.8rem;">NVDEC ZERO-COPY VRAM</span>
+              <span class="text-hud" style="color: var(--cb-yellow);">// ACTIVE CLUSTER NODES</span>
+              <div class="metric-value" style="color: var(--cb-yellow);">3 / 3</div>
+              <span class="text-mono" style="color: var(--cb-yellow); font-size: 0.75rem;">GPU-01 | CPU-02 | EDGE-03</span>
+            </div>
+
+            <div class="metric-card cyber-cut-tr" style="border-left-color: var(--cb-green);">
+              <span class="text-hud" style="color: var(--cb-green);">// DECODE LATENCY (Δt)</span>
+              <div class="metric-value" style="color: var(--cb-green);">1.42 ms</div>
+              <span class="text-mono" style="color: var(--cb-green); font-size: 0.75rem;">NVDEC ZERO-COPY VRAM</span>
             </div>
 
             <div class="metric-card cyber-cut-tr" style="border-left-color: var(--cb-magenta);">
-              <span class="text-hud" style="color: var(--cb-text-muted);">// POSIX SHM RAM OCCUPANCY</span>
+              <span class="text-hud" style="color: var(--cb-magenta);">// POSIX SHM RAM OCCUPANCY</span>
               <div class="metric-value" style="color: var(--cb-magenta);">18.4 %</div>
-              <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.8rem;">ATOMIC LOCK-FREE RING BUFFERS</span>
-            </div>
-
-            <div class="metric-card cyber-cut-tr" style="border-left-color: var(--cb-amber);">
-              <span class="text-hud" style="color: var(--cb-text-muted);">// INGESTION NETWORK FLOW</span>
-              <div class="metric-value" style="color: var(--cb-amber);">54.2 Mbps</div>
-              <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.8rem;">AGGREGATED RTSP INBOUND</span>
+              <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.75rem;">ATOMIC LOCK-FREE RING</span>
             </div>
           </div>
 
-          <!-- Quick Actions Panel -->
-          <div style="background-color: var(--cb-bg-surface); border: 1px solid var(--cb-border-dim); border-left: 3px solid var(--cb-yellow); padding: 1.5rem; margin-top: 1.5rem;" class="cyber-cut-tr">
-            <h4 style="color: var(--cb-yellow); margin-bottom: 0.5rem;">// STREAM MATRIX RESOURCE ANALYZER</h4>
-            <p class="text-mono" style="color: var(--cb-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
-              Inspect real-time camera ingestion sorted by highest resource consumption (CPU/GPU/Latency), tune server-side sampling rates, and view network flow telemetry in the Stream Matrix Studio.
-            </p>
-            <a href="#stream-matrix" class="cyber-btn cyber-btn-primary" style="text-decoration: none;">OPEN STREAM MATRIX & RESOURCE MONITOR →</a>
+          <!-- Live Telemetry Charts Grid -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+            
+            <!-- Chart 1: Ingestion Network Flow History (SVG Area Chart - Cyan) -->
+            <div style="background-color: var(--cb-bg-surface); border: 1px solid var(--cb-border-dim); border-top: 2px solid var(--cb-cyan); padding: 1.25rem;" class="cyber-cut-tr">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <span class="text-hud" style="color: var(--cb-cyan);">// INBOUND NETWORK FLOW & BANDWIDTH (Mbps)</span>
+                <span class="text-mono" style="color: var(--cb-yellow); font-size: 0.8rem; font-weight: bold;">PEAK: 62.4 Mbps</span>
+              </div>
+              
+              <!-- Cyberpunk Live Network Flow SVG Chart -->
+              <div style="width: 100%; height: 160px; position: relative; background: rgba(0,240,255,0.02); border: 1px solid var(--cb-border-dim); overflow: hidden;">
+                <svg viewBox="0 0 500 160" style="width: 100%; height: 100%;" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#00f0ff" stop-opacity="0.4"/>
+                      <stop offset="100%" stop-color="#00f0ff" stop-opacity="0.0"/>
+                    </linearGradient>
+                  </defs>
+                  <!-- Grid lines -->
+                  <line x1="0" y1="40" x2="500" y2="40" stroke="#1d2230" stroke-dasharray="4"/>
+                  <line x1="0" y1="80" x2="500" y2="80" stroke="#1d2230" stroke-dasharray="4"/>
+                  <line x1="0" y1="120" x2="500" y2="120" stroke="#1d2230" stroke-dasharray="4"/>
+                  
+                  <!-- Area Fill -->
+                  <polygon points="0,160 0,110 50,95 100,120 150,70 200,85 250,45 300,60 350,30 400,50 450,25 500,40 500,160" fill="url(#cyanGrad)"/>
+                  <!-- Polyline Trend -->
+                  <polyline points="0,110 50,95 100,120 150,70 200,85 250,45 300,60 350,30 400,50 450,25 500,40" fill="none" stroke="#00f0ff" stroke-width="2.5"/>
+                  
+                  <!-- Live Data Dots -->
+                  <circle cx="350" cy="30" r="4" fill="#00f0ff"/>
+                  <circle cx="450" cy="25" r="4" fill="#fcee0a"/>
+                  <circle cx="500" cy="40" r="4" fill="#00f0ff"/>
+                </svg>
+              </div>
+              
+              <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;" class="text-mono">
+                <span style="color: var(--cb-text-muted); font-size: 0.75rem;">-60 SEC AGO</span>
+                <span style="color: var(--cb-cyan); font-size: 0.75rem;">CURRENT: 54.2 Mbps</span>
+                <span style="color: var(--cb-text-muted); font-size: 0.75rem;">LIVE PASS-THROUGH</span>
+              </div>
+            </div>
+
+            <!-- Chart 2: Decode Latency Distribution Histogram (SVG Bar Chart - Yellow) -->
+            <div style="background-color: var(--cb-bg-surface); border: 1px solid var(--cb-border-dim); border-top: 2px solid var(--cb-yellow); padding: 1.25rem;" class="cyber-cut-tr">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <span class="text-hud" style="color: var(--cb-yellow);">// HARDWARE DECODE LATENCY DISTRIBUTION (ms)</span>
+                <span class="text-mono" style="color: var(--cb-cyan); font-size: 0.8rem; font-weight: bold;">AVG: 1.42 ms</span>
+              </div>
+
+              <!-- Cyberpunk Latency Histogram SVG -->
+              <div style="width: 100%; height: 160px; position: relative; background: rgba(252,238,10,0.02); border: 1px solid var(--cb-border-dim); overflow: hidden;">
+                <svg viewBox="0 0 500 160" style="width: 100%; height: 100%;" preserveAspectRatio="none">
+                  <!-- Bars -->
+                  <rect x="20" y="100" width="30" height="60" fill="#fcee0a" opacity="0.6"/>
+                  <rect x="70" y="70" width="30" height="90" fill="#fcee0a" opacity="0.8"/>
+                  <rect x="120" y="40" width="30" height="120" fill="#00f0ff" opacity="0.9"/>
+                  <rect x="170" y="20" width="30" height="140" fill="#00f0ff"/>
+                  <rect x="220" y="50" width="30" height="110" fill="#fcee0a" opacity="0.85"/>
+                  <rect x="270" y="85" width="30" height="75" fill="#fcee0a" opacity="0.7"/>
+                  <rect x="320" y="110" width="30" height="50" fill="#fcee0a" opacity="0.5"/>
+                  <rect x="370" y="130" width="30" height="30" fill="#ff0055" opacity="0.6"/>
+                  <rect x="420" y="145" width="30" height="15" fill="#ff0055" opacity="0.4"/>
+                </svg>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;" class="text-mono">
+                <span style="color: var(--cb-cyan); font-size: 0.75rem;">&lt; 0.5 ms (NVDEC)</span>
+                <span style="color: var(--cb-yellow); font-size: 0.75rem;">1.0-2.0 ms (TARGET)</span>
+                <span style="color: var(--cb-magenta); font-size: 0.75rem;">&gt; 3.0 ms (SW FALLBACK)</span>
+              </div>
+            </div>
+
           </div>
+
+          <!-- Cluster Nodes Status Table -->
+          <div style="background-color: var(--cb-bg-surface); border: 1px solid var(--cb-border-dim); border-left: 3px solid var(--cb-yellow); padding: 1.25rem;" class="cyber-cut-tr">
+            <h4 style="color: var(--cb-yellow); margin-bottom: 0.75rem;">// ACTIVE CLUSTER TOPOLOGY & HARDWARE NODES</h4>
+            <table class="cyber-table cyber-table-slim">
+              <thead>
+                <tr>
+                  <th style="color: var(--cb-yellow);">NODE_NAME</th>
+                  <th style="color: var(--cb-yellow);">IP ADDRESS</th>
+                  <th style="color: var(--cb-yellow);">ARCHITECTURE</th>
+                  <th style="color: var(--cb-yellow);">HARDWARE ACCELERATOR</th>
+                  <th style="color: var(--cb-yellow);">DECODER ENGINE</th>
+                  <th style="color: var(--cb-yellow);">STATUS</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong style="color: var(--cb-cyan);">node-alpha-gpu-01</strong></td>
+                  <td class="text-mono" style="color: var(--cb-text-main);">10.0.4.101</td>
+                  <td class="text-mono" style="color: var(--cb-text-muted);">x86_64 / Linux 6.8</td>
+                  <td class="text-mono" style="color: var(--cb-yellow);">NVIDIA RTX 4090 (24GB VRAM)</td>
+                  <td class="text-mono" style="color: var(--cb-cyan);">NVDEC Zero-Copy CUDA IPC</td>
+                  <td><span class="status-badge">ONLINE</span></td>
+                </tr>
+                <tr>
+                  <td><strong style="color: var(--cb-cyan);">node-beta-cpu-02</strong></td>
+                  <td class="text-mono" style="color: var(--cb-text-main);">10.0.4.102</td>
+                  <td class="text-mono" style="color: var(--cb-text-muted);">x86_64 / Linux 6.8</td>
+                  <td class="text-mono" style="color: var(--cb-text-muted);">Intel Xeon Gold (64 Cores)</td>
+                  <td class="text-mono" style="color: var(--cb-green);">FFmpeg POSIX SHM Ring Buffer</td>
+                  <td><span class="status-badge">ONLINE</span></td>
+                </tr>
+                <tr>
+                  <td><strong style="color: var(--cb-cyan);">node-gamma-edge-03</strong></td>
+                  <td class="text-mono" style="color: var(--cb-text-main);">10.0.4.103</td>
+                  <td class="text-mono" style="color: var(--cb-text-muted);">aarch64 / Jetson Orin</td>
+                  <td class="text-mono" style="color: var(--cb-yellow);">NVIDIA Jetson AGX (64GB)</td>
+                  <td class="text-mono" style="color: var(--cb-cyan);">NVDEC Hardware Decoder</td>
+                  <td><span class="status-badge">ONLINE</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
         </div>
 
         <!-- View 2: Stream Matrix & Real-Time Resource Ingestion Studio -->
