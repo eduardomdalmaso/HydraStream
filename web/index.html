@@ -129,57 +129,125 @@
       <!-- Main Body Content -->
       <main class="main-content">
         
-        <!-- Metrics Row -->
-        <div class="metrics-grid">
-          <div class="metric-card cyber-cut-tr">
-            <span class="text-hud" style="color: var(--cb-text-muted);">// ACTIVE RTSP FEEDS</span>
-            <div class="metric-value">12 / 12</div>
-            <span class="text-mono" style="color: var(--cb-green); font-size: 0.8rem;">● SINGLE INGEST PIPE ACTIVE</span>
+        <!-- View 1: Control Panel -->
+        <div id="view-control-panel" class="spa-view">
+          <!-- Metrics Row -->
+          <div class="metrics-grid">
+            <div class="metric-card cyber-cut-tr">
+              <span class="text-hud" style="color: var(--cb-text-muted);">// ACTIVE RTSP FEEDS</span>
+              <div class="metric-value">12 / 12</div>
+              <span class="text-mono" style="color: var(--cb-green); font-size: 0.8rem;">● SINGLE INGEST PIPE ACTIVE</span>
+            </div>
+
+            <div class="metric-card cyber-cut-tr" style="border-left-color: var(--cb-yellow);">
+              <span class="text-hud" style="color: var(--cb-text-muted);">// DECODE LATENCY</span>
+              <div class="metric-value" style="color: var(--cb-cyan);">1.42 ms</div>
+              <span class="text-mono" style="color: var(--cb-cyan); font-size: 0.8rem;">NVDEC HARDWARE ZERO-COPY</span>
+            </div>
+
+            <div class="metric-card cyber-cut-tr" style="border-left-color: var(--cb-magenta);">
+              <span class="text-hud" style="color: var(--cb-text-muted);">// SHM RAM OCCUPANCY</span>
+              <div class="metric-value" style="color: var(--cb-magenta);">18.4 %</div>
+              <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.8rem;">POSIX /dev/shm LOCK-FREE</span>
+            </div>
           </div>
 
-          <div class="metric-card cyber-cut-tr" style="border-left-color: var(--cb-yellow);">
-            <span class="text-hud" style="color: var(--cb-text-muted);">// DECODE LATENCY</span>
-            <div class="metric-value" style="color: var(--cb-cyan);">1.42 ms</div>
-            <span class="text-mono" style="color: var(--cb-cyan); font-size: 0.8rem;">NVDEC HARDWARE ZERO-COPY</span>
+          <!-- Input Types Tab Filters -->
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+            <h3 style="color: var(--cb-yellow); margin-bottom: 0;">// MEDIA INPUT INGESTION MATRIX</h3>
           </div>
 
-          <div class="metric-card cyber-cut-tr" style="border-left-color: var(--cb-magenta);">
-            <span class="text-hud" style="color: var(--cb-text-muted);">// SHM RAM OCCUPANCY</span>
-            <div class="metric-value" style="color: var(--cb-magenta);">18.4 %</div>
-            <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.8rem;">POSIX /dev/shm LOCK-FREE</span>
+          <div class="cyber-tab-group" id="inputTabs">
+            <button class="cyber-tab-btn active" data-filter="all" onclick="filterInputs('all')">[ ALL INPUTS (<span id="countAll">12</span>) ]</button>
+            <button class="cyber-tab-btn" data-filter="rtsp" onclick="filterInputs('rtsp')">[ RTSP CAMERAS (<span id="countRtsp">8</span>) ]</button>
+            <button class="cyber-tab-btn" data-filter="mp4" onclick="filterInputs('mp4')">[ MP4 VIRTUAL FEEDS (<span id="countMp4">2</span>) ]</button>
+            <button class="cyber-tab-btn" data-filter="imageseq" onclick="filterInputs('imageseq')">[ IMAGE SEQUENCES (<span id="countImg">2</span>) ]</button>
+          </div>
+
+          <!-- Telemetry Data Table -->
+          <div class="cyber-table-container cyber-cut-tr">
+            <table class="cyber-table">
+              <thead>
+                <tr>
+                  <th>STREAM_ID // TENANT</th>
+                  <th>INPUT PROTOCOL & SOURCE ENDPOINT</th>
+                  <th>CODEC / RES</th>
+                  <th>LATENCY</th>
+                  <th>ANALYTIC CONSUMERS & FPS GOVERNOR</th>
+                  <th>MEMORY TRANSPORT</th>
+                  <th>STATUS</th>
+                </tr>
+              </thead>
+              <tbody id="streamTableBody">
+                <!-- Dynamically Populated Rows -->
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <!-- Input Types Tab Filters -->
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-          <h3 style="color: var(--cb-yellow); margin-bottom: 0;">// MEDIA INPUT INGESTION MATRIX</h3>
-        </div>
+        <!-- View 2: Stream Matrix & Consumer Multiplexer Studio -->
+        <div id="view-stream-matrix" class="spa-view" style="display: none;">
+          <h3 style="color: var(--cb-yellow); margin-bottom: 1rem;">// STREAM MATRIX & CONSUMER THROTTLE STUDIO</h3>
+          
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+            <!-- Left: Live Quad Preview Grid -->
+            <div style="background-color: var(--cb-bg-surface); border: 1px solid var(--cb-border-dim); padding: 1rem;" class="cyber-cut-tr">
+              <span class="text-hud" style="color: var(--cb-cyan);">// MULTI-STREAM QUAD PREVIEW CANVAS</span>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                <div style="background-color: #000; height: 180px; position: relative;" class="cyber-cut-tr">
+                  <span style="position: absolute; top: 8px; left: 8px; font-family: var(--font-mono); font-size: 0.75rem; color: var(--cb-cyan); background: rgba(0,0,0,0.7); padding: 2px 6px;">CAM_ENTRANCE_01</span>
+                  <img src="/api/v1/streams/cam_entrance_01/mjpeg?fps=5" alt="Preview 1" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://placehold.co/400x300/0e1017/00f0ff?text=CAM_ENTRANCE_01';">
+                </div>
+                <div style="background-color: #000; height: 180px; position: relative;" class="cyber-cut-tr">
+                  <span style="position: absolute; top: 8px; left: 8px; font-family: var(--font-mono); font-size: 0.75rem; color: var(--cb-yellow); background: rgba(0,0,0,0.7); padding: 2px 6px;">CAM_PARKING_NORTH</span>
+                  <img src="/api/v1/streams/cam_parking_north/mjpeg?fps=5" alt="Preview 2" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://placehold.co/400x300/0e1017/fcee0a?text=CAM_PARKING_NORTH';">
+                </div>
+                <div style="background-color: #000; height: 180px; position: relative;" class="cyber-cut-tr">
+                  <span style="position: absolute; top: 8px; left: 8px; font-family: var(--font-mono); font-size: 0.75rem; color: var(--cb-green); background: rgba(0,0,0,0.7); padding: 2px 6px;">SIM_TRAFFIC_LOOP</span>
+                  <img src="https://placehold.co/400x300/0e1017/00ff66?text=SIM_TRAFFIC_LOOP" style="width: 100%; height: 100%; object-fit: cover;">
+                </div>
+                <div style="background-color: #000; height: 180px; position: relative;" class="cyber-cut-tr">
+                  <span style="position: absolute; top: 8px; left: 8px; font-family: var(--font-mono); font-size: 0.75rem; color: var(--cb-magenta); background: rgba(0,0,0,0.7); padding: 2px 6px;">SIM_OFFLINE_FRAMES</span>
+                  <img src="https://placehold.co/400x300/0e1017/ff0055?text=SIM_OFFLINE_FRAMES" style="width: 100%; height: 100%; object-fit: cover;">
+                </div>
+              </div>
+            </div>
 
-        <div class="cyber-tab-group" id="inputTabs">
-          <button class="cyber-tab-btn active" data-filter="all" onclick="filterInputs('all')">[ ALL INPUTS (<span id="countAll">12</span>) ]</button>
-          <button class="cyber-tab-btn" data-filter="rtsp" onclick="filterInputs('rtsp')">[ RTSP CAMERAS (<span id="countRtsp">8</span>) ]</button>
-          <button class="cyber-tab-btn" data-filter="mp4" onclick="filterInputs('mp4')">[ MP4 VIRTUAL FEEDS (<span id="countMp4">2</span>) ]</button>
-          <button class="cyber-tab-btn" data-filter="imageseq" onclick="filterInputs('imageseq')">[ IMAGE SEQUENCES (<span id="countImg">2</span>) ]</button>
-        </div>
+            <!-- Right: Real-time Consumer Throttle Controls -->
+            <div style="background-color: var(--cb-bg-surface); border: 1px solid var(--cb-border-dim); padding: 1rem;" class="cyber-cut-tr">
+              <span class="text-hud" style="color: var(--cb-yellow);">// DYNAMIC FPS GOVERNOR TUNER</span>
+              <p class="text-mono" style="font-size: 0.8rem; color: var(--cb-text-muted); margin-top: 0.5rem; margin-bottom: 1rem;">
+                Adjust target sampling rate per consumer on the fly via PATCH /api/v1/streams/{id}/consumers/{type}
+              </p>
 
-        <!-- Telemetry Data Table -->
-        <div class="cyber-table-container cyber-cut-tr">
-          <table class="cyber-table">
-            <thead>
-              <tr>
-                <th>STREAM_ID // TENANT</th>
-                <th>INPUT PROTOCOL & SOURCE ENDPOINT</th>
-                <th>CODEC / RES</th>
-                <th>LATENCY</th>
-                <th>ANALYTIC CONSUMERS & FPS GOVERNOR</th>
-                <th>MEMORY TRANSPORT</th>
-                <th>STATUS</th>
-              </tr>
-            </thead>
-            <tbody id="streamTableBody">
-              <!-- Dynamically Populated Rows -->
-            </tbody>
-          </table>
+              <div style="margin-bottom: 1.25rem;">
+                <label class="cyber-label">// SELECT STREAM FEED</label>
+                <select class="cyber-input" id="tunerStreamSelect">
+                  <option value="cam_entrance_01">CAM_ENTRANCE_01 (RTSP)</option>
+                  <option value="cam_parking_north">CAM_PARKING_NORTH (RTSP)</option>
+                  <option value="sim_traffic_loop">SIM_TRAFFIC_LOOP (MP4)</option>
+                </select>
+              </div>
+
+              <div style="margin-bottom: 1rem; background-color: var(--cb-bg-elevated); padding: 0.75rem;" class="cyber-cut-tr">
+                <span class="text-mono" style="color: var(--cb-cyan); font-weight: bold;">CONSUMER: YOLOv8_DETECTOR</span>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem;">
+                  <span class="text-mono" style="color: var(--cb-text-muted);">TARGET FPS: <strong id="fpsValYolo" style="color: var(--cb-yellow);">5 FPS</strong></span>
+                  <input type="range" min="1" max="30" value="5" oninput="document.getElementById('fpsValYolo').innerText = this.value + ' FPS'">
+                </div>
+              </div>
+
+              <div style="margin-bottom: 1rem; background-color: var(--cb-bg-elevated); padding: 0.75rem;" class="cyber-cut-tr">
+                <span class="text-mono" style="color: var(--cb-cyan); font-weight: bold;">CONSUMER: LPR_OCR_READER</span>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem;">
+                  <span class="text-mono" style="color: var(--cb-text-muted);">TARGET FPS: <strong id="fpsValLpr" style="color: var(--cb-yellow);">2 FPS</strong></span>
+                  <input type="range" min="1" max="30" value="2" oninput="document.getElementById('fpsValLpr').innerText = this.value + ' FPS'">
+                </div>
+              </div>
+
+              <button class="cyber-btn cyber-btn-primary" style="width: 100%; margin-top: 0.5rem;" onclick="alert('FPS Governor throttles updated via REST API!')">APPLY DYNAMIC THROTTLE</button>
+            </div>
+          </div>
         </div>
 
       </main>
@@ -353,6 +421,18 @@
           link.classList.remove('active');
         }
       });
+
+      // SPA View Visibility Toggle
+      const viewCp = document.getElementById('view-control-panel');
+      const viewSm = document.getElementById('view-stream-matrix');
+
+      if (hash === '#stream-matrix') {
+        if (viewCp) viewCp.style.display = 'none';
+        if (viewSm) viewSm.style.display = 'block';
+      } else {
+        if (viewCp) viewCp.style.display = 'block';
+        if (viewSm) viewSm.style.display = 'none';
+      }
     }
 
     // Initialize on page load and location hash change
