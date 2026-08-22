@@ -182,6 +182,21 @@
                 <!-- Dynamically Populated Rows -->
               </tbody>
             </table>
+
+            <!-- Pagination Controls (10 items per page) -->
+            <div class="cyber-pagination">
+              <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.8rem;">
+                SHOWING <span id="pageRangeText" style="color: var(--cb-cyan);">1-10</span> OF <span id="totalItemsText" style="color: var(--cb-yellow);">12</span> ENTRIES (10 PER PAGE)
+              </span>
+
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button class="pagination-btn" id="btnPrevPage" onclick="changePage(-1)">[ &lt;&lt; PREV ]</button>
+                <span class="text-mono" style="color: var(--cb-yellow); font-size: 0.85rem; font-weight: bold; margin: 0 0.5rem;">
+                  PAGE <span id="currentPageText">1</span> / <span id="totalPagesText">2</span>
+                </span>
+                <button class="pagination-btn" id="btnNextPage" onclick="changePage(1)">[ NEXT &gt;&gt; ]</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -269,58 +284,27 @@
       document.getElementById('registerModal').style.display = 'none';
     }    let currentFilter = 'all';
     let rawStreams = [];
+    let currentPage = 1;
+    const pageSize = 10;
 
-    // Sample data generator if backend is running minimal store
-    const sampleStreams = [
-      {
-        stream_id: 'cam_entrance_01',
+    // Sample data generator with 12 streams to demonstrate 10-per-page pagination
+    const sampleStreams = Array.from({ length: 12 }, (_, i) => {
+      const types = ['rtsp', 'rtsp', 'mp4', 'imageseq'];
+      const type = types[i % 4];
+      const numStr = String(i + 1).padStart(2, '0');
+      return {
+        stream_id: `cam_feed_${numStr}`,
         tenant_id: 'tenant_company_alpha',
-        source_url: 'rtsp://mediamtx:8554/tenant_company_alpha/cam_entrance_01',
-        type: 'rtsp',
-        codec: 'H.264',
+        source_url: type === 'rtsp' ? `rtsp://mediamtx:8554/tenant/cam_${numStr}` : (type === 'mp4' ? `/var/videos/clip_${numStr}.mp4` : `dir:///var/data/frames_${numStr}/`),
+        type: type,
+        codec: type === 'rtsp' ? 'H.264' : (type === 'mp4' ? 'H.265' : 'RAW JPG'),
         resolution: '1920x1080',
-        latency: '1.42 ms',
-        consumers: ['YOLOv8 @ 5 FPS', 'LPR OCR @ 2 FPS'],
-        transport: 'POSIX SHM (Lock-Free)',
+        latency: (1.10 + (i * 0.05)).toFixed(2) + ' ms',
+        consumers: type === 'rtsp' ? ['YOLOv8 @ 5 FPS', 'LPR OCR @ 2 FPS'] : ['TRITON TENSORRT @ 30 FPS'],
+        transport: type === 'rtsp' ? 'POSIX SHM (Lock-Free)' : 'CUDA IPC (Zero-Copy VRAM)',
         status: 'ONLINE'
-      },
-      {
-        stream_id: 'cam_parking_north',
-        tenant_id: 'tenant_company_alpha',
-        source_url: 'rtsp://mediamtx:8554/tenant_company_alpha/cam_parking_north',
-        type: 'rtsp',
-        codec: 'H.265',
-        resolution: '2560x1440',
-        latency: '0.85 ms',
-        consumers: ['TRITON TENSORRT @ 30 FPS'],
-        transport: 'CUDA IPC (Zero-Copy VRAM)',
-        status: 'ONLINE'
-      },
-      {
-        stream_id: 'sim_traffic_loop',
-        tenant_id: 'tenant_company_alpha',
-        source_url: '/var/videos/traffic_simulation.mp4',
-        type: 'mp4',
-        codec: 'H.264',
-        resolution: '1920x1080',
-        latency: '0.35 ms',
-        consumers: ['SPEED_ESTIMATOR @ 15 FPS', 'VEHICLE_COUNT @ 10 FPS'],
-        transport: 'POSIX SHM (Lock-Free)',
-        status: 'LOOPING'
-      },
-      {
-        stream_id: 'sim_offline_frames',
-        tenant_id: 'tenant_company_alpha',
-        source_url: 'dir:///var/data/frames_sequence/',
-        type: 'imageseq',
-        codec: 'RAW JPG',
-        resolution: '1280x720',
-        latency: '0.12 ms',
-        consumers: ['FACE_EMBEDDING @ 1 FPS'],
-        transport: 'POSIX SHM (Lock-Free)',
-        status: 'ACTIVE'
-      }
-    ];
+      };
+    });
 
     async function loadStreams() {
       try {
@@ -339,11 +323,13 @@
       } catch (e) {
         rawStreams = sampleStreams;
       }
+      currentPage = 1;
       renderTable();
     }
 
     function filterInputs(type) {
       currentFilter = type;
+      currentPage = 1;
       const tabBtns = document.querySelectorAll('.cyber-tab-btn');
       tabBtns.forEach(btn => {
         if (btn.getAttribute('data-filter') === type) {
@@ -355,22 +341,47 @@
       renderTable();
     }
 
+    function changePage(delta) {
+      const filtered = rawStreams.filter(st => currentFilter === 'all' || st.type === currentFilter);
+      const totalPages = Math.ceil(filtered.length / pageSize) || 1;
+      currentPage = Math.max(1, Math.min(totalPages, currentPage + delta));
+      renderTable();
+    }
+
     function renderTable() {
       const tbody = document.getElementById('streamTableBody');
       const filtered = rawStreams.filter(st => currentFilter === 'all' || st.type === currentFilter);
 
-      // Update counters
+      // Update Tab counters
       document.getElementById('countAll').innerText = rawStreams.length;
       document.getElementById('countRtsp').innerText = rawStreams.filter(s => s.type === 'rtsp').length;
       document.getElementById('countMp4').innerText = rawStreams.filter(s => s.type === 'mp4').length;
       document.getElementById('countImg').innerText = rawStreams.filter(s => s.type === 'imageseq').length;
 
-      if (!filtered || filtered.length === 0) {
+      // Calculate Pagination
+      const totalItems = filtered.length;
+      const totalPages = Math.ceil(totalItems / pageSize) || 1;
+      if (currentPage > totalPages) currentPage = totalPages;
+
+      const startIndex = (currentPage - 1) * pageSize;
+      const endIndex = Math.min(startIndex + pageSize, totalItems);
+      const pageItems = filtered.slice(startIndex, endIndex);
+
+      // Update Pagination UI Indicators
+      document.getElementById('pageRangeText').innerText = totalItems > 0 ? `${startIndex + 1}-${endIndex}` : '0-0';
+      document.getElementById('totalItemsText').innerText = totalItems;
+      document.getElementById('currentPageText').innerText = currentPage;
+      document.getElementById('totalPagesText').innerText = totalPages;
+
+      document.getElementById('btnPrevPage').disabled = (currentPage <= 1);
+      document.getElementById('btnNextPage').disabled = (currentPage >= totalPages);
+
+      if (!pageItems || pageItems.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="text-mono" style="color: var(--cb-text-muted); text-align: center;">// NO INPUT SOURCES MATCH FILTER</td></tr>';
         return;
       }
 
-      tbody.innerHTML = filtered.map(st => {
+      tbody.innerHTML = pageItems.map(st => {
         const protocolBadge = st.type === 'rtsp' 
           ? '<span class="badge-protocol">RTSP LIVE</span>' 
           : (st.type === 'mp4' ? '<span class="badge-protocol mp4">MP4 LOOP</span>' : '<span class="badge-protocol imageseq">IMAGE SEQ</span>');
