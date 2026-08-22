@@ -114,19 +114,92 @@ const OpenAPI3Spec = `{
   }
 }`
 
-// ServeSwaggerUI returns a lightweight standalone Swagger UI HTML page.
+// ServeSwaggerUI returns a lightweight standalone Swagger UI HTML page with Cyberpunk 2077 HUD styling.
 func ServeSwaggerUI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	html := `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>HydraStream API // Swagger UI</title>
+  <title>HydraStream API // Cyberpunk 2077 Swagger UI</title>
   <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Orbitron:wght@800&family=Share+Tech+Mono&display=swap">
   <style>
-    body { margin: 0; padding: 0; background-color: #0b0c10; }
-    .swagger-ui .topbar { display: none; }
-    .swagger-ui { filter: invert(0.88) hue-rotate(180deg); }
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #07080c !important;
+      font-family: 'Chakra Petch', sans-serif !important;
+      color: #f0f2f5 !important;
+      background-image: 
+        linear-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px) !important;
+      background-size: 30px 30px !important;
+    }
+    .swagger-ui .topbar { display: none !important; }
+    .swagger-ui {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    .swagger-ui .info { margin: 2rem 0; border-bottom: 2px solid #fcee0a; padding-bottom: 1rem; }
+    .swagger-ui .info .title {
+      font-family: 'Orbitron', sans-serif !important;
+      color: #fcee0a !important;
+      text-transform: uppercase;
+      font-size: 2.2rem !important;
+      letter-spacing: 0.08em;
+    }
+    .swagger-ui .info p, .swagger-ui .info li { color: #8b94a7 !important; font-size: 1rem; }
+    .swagger-ui .opblock-tag {
+      font-family: 'Orbitron', sans-serif !important;
+      color: #00f0ff !important;
+      border-bottom: 1px solid #232736 !important;
+      text-transform: uppercase;
+    }
+    .swagger-ui .opblock {
+      background: #0e1017 !important;
+      border: 1px solid #232736 !important;
+      border-left: 4px solid #00f0ff !important;
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.1) !important;
+      margin-bottom: 1rem !important;
+    }
+    .swagger-ui .opblock .opblock-summary-method {
+      font-family: 'Orbitron', sans-serif !important;
+      font-weight: 900 !important;
+      border-radius: 0 !important;
+      text-transform: uppercase !important;
+    }
+    .swagger-ui .opblock-get { border-left-color: #00f0ff !important; }
+    .swagger-ui .opblock-get .opblock-summary-method { background-color: #00f0ff !important; color: #07080c !important; }
+    .swagger-ui .opblock-post { border-left-color: #fcee0a !important; }
+    .swagger-ui .opblock-post .opblock-summary-method { background-color: #fcee0a !important; color: #07080c !important; }
+    .swagger-ui .opblock-patch { border-left-color: #ffaa00 !important; }
+    .swagger-ui .opblock-patch .opblock-summary-method { background-color: #ffaa00 !important; color: #07080c !important; }
+    .swagger-ui .opblock-delete { border-left-color: #ff0055 !important; }
+    .swagger-ui .opblock-delete .opblock-summary-method { background-color: #ff0055 !important; color: #ffffff !important; }
+    .swagger-ui .opblock-summary-path, .swagger-ui .opblock-summary-description {
+      color: #f0f2f5 !important;
+      font-family: 'Share Tech Mono', monospace !important;
+    }
+    .swagger-ui .btn {
+      font-family: 'Orbitron', sans-serif !important;
+      background: #fcee0a !important;
+      color: #07080c !important;
+      border: none !important;
+      text-transform: uppercase;
+      font-weight: 800;
+    }
+    .swagger-ui table thead tr th, .swagger-ui .response-col_status, .swagger-ui .parameter__name {
+      color: #00f0ff !important;
+      font-family: 'Share Tech Mono', monospace !important;
+    }
+    .swagger-ui textarea, .swagger-ui input[type=text] {
+      background: #07080c !important;
+      color: #00f0ff !important;
+      border: 1px solid #232736 !important;
+      font-family: 'Share Tech Mono', monospace !important;
+    }
   </style>
 </head>
 <body>
