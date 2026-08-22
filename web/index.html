@@ -122,7 +122,7 @@
 
         <div style="display: flex; gap: 1rem; align-items: center;">
           <button class="cyber-btn cyber-btn-secondary" onclick="toggleTheme()">TOGGLE THEME</button>
-          <button class="cyber-btn cyber-btn-primary" onclick="openModal()">+ REGISTER CAMERA</button>
+          <a href="/swagger/" target="_blank" class="cyber-btn cyber-btn-primary" style="text-decoration: none;">API DOCS (SWAGGER)</a>
         </div>
       </header>
 
@@ -162,7 +162,7 @@
               <span class="status-badge">30 FPS // ONLINE</span>
             </div>
             <div class="camera-preview">
-              <img src="/api/v1/streams/cam_entrance_01/mjpeg?fps=5" alt="Camera Stream Preview" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://placehold.co/600x400/0e1017/00f0ff?text=HYDRASTREAM+MJPEG+FEED';">
+              <img src="/api/v1/streams/cam_entrance_01/mjpeg?fps=5" alt="Camera Stream Preview" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://placehold.co/600x400/0e1017/00f0ff?text=HYDRASTREAM+LIVE+FEED';">
             </div>
             <div style="padding: 0.75rem 1rem; background-color: var(--cb-bg-surface);">
               <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.8rem;">ANALYTICS: YOLOv8 (5 FPS) | LPR OCR (2 FPS)</span>
@@ -176,7 +176,7 @@
               <span class="status-badge">30 FPS // ONLINE</span>
             </div>
             <div class="camera-preview">
-              <img src="/api/v1/streams/cam_parking_north/mjpeg?fps=5" alt="Camera Stream Preview" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://placehold.co/600x400/0e1017/fcee0a?text=HYDRASTREAM+MJPEG+FEED';">
+              <img src="/api/v1/streams/cam_parking_north/mjpeg?fps=5" alt="Camera Stream Preview" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://placehold.co/600x400/0e1017/fcee0a?text=HYDRASTREAM+LIVE+FEED';">
             </div>
             <div style="padding: 0.75rem 1rem; background-color: var(--cb-bg-surface);">
               <span class="text-mono" style="color: var(--cb-text-muted); font-size: 0.8rem;">ANALYTICS: TRITON TENSORRT (30 FPS)</span>
@@ -186,47 +186,6 @@
         </div>
 
       </main>
-    </div>
-  </div>
-
-  <!-- Cyberpunk Stream Registration Modal -->
-  <div id="registerModal" class="cyber-modal-overlay" style="display: none;">
-    <div class="cyber-modal cyber-cut-modal glow-cyan">
-      
-      <div class="cyber-modal-header">
-        <h2 style="font-size: 1.25rem; color: var(--cb-yellow);">// REGISTER RTSP CAMERA STREAM</h2>
-        <button onclick="closeModal()" style="background: none; border: none; color: var(--cb-magenta); font-size: 1.5rem; cursor: pointer; font-weight: bold;">✕</button>
-      </div>
-
-      <form onsubmit="submitStreamForm(event)">
-        
-        <div style="margin-bottom: 1rem;">
-          <label class="cyber-label">// TENANT_ID</label>
-          <input type="text" id="inputTenant" class="cyber-input" value="tenant_company_alpha" readonly>
-        </div>
-
-        <div style="margin-bottom: 1rem;">
-          <label class="cyber-label">// STREAM_ID_NAME</label>
-          <input type="text" id="inputStreamId" class="cyber-input" placeholder="e.g. cam_gate_02" required>
-        </div>
-
-        <div style="margin-bottom: 1rem;">
-          <label class="cyber-label">// RTSP_SOURCE_URL</label>
-          <input type="url" id="inputSourceUrl" class="cyber-input" placeholder="rtsp://admin:pass@192.168.1.50:554/stream1" required>
-        </div>
-
-        <div style="margin-bottom: 1.5rem;">
-          <label class="cyber-label">// TARGET_ANALYTIC_FPS</label>
-          <input type="number" id="inputFps" class="cyber-input" value="15" min="1" max="60">
-        </div>
-
-        <div style="display: flex; justify-content: flex-end; gap: 1rem;">
-          <button type="button" class="cyber-btn cyber-btn-secondary" onclick="closeModal()">CANCEL</button>
-          <button type="submit" class="cyber-btn cyber-btn-primary">INITIALIZE PIPELINE</button>
-        </div>
-
-      </form>
-
     </div>
   </div>
 
