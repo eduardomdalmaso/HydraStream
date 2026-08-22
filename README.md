@@ -1,4 +1,4 @@
-# HydraStream 🐉🎥
+# HydraStream
 
 > **High-performance, zero-overhead frame fan-out & decoding pipeline for computer vision and Triton analytics in Go & Rust.**
 
@@ -10,7 +10,7 @@
 
 ---
 
-## 🎯 The Problem
+## The Problem
 
 In scaled computer vision and video analytics pipelines, running multiple downstream analytics models against camera feeds creates three major performance killers:
 
@@ -20,7 +20,7 @@ In scaled computer vision and video analytics pipelines, running multiple downst
 
 ---
 
-## 💡 The Solution
+## The Solution
 
 **HydraStream** acts as a centralized, ultra-efficient stream multiplexer and frame engine (*one stream feed, multiple throttled analytics heads*):
 
@@ -34,7 +34,7 @@ In scaled computer vision and video analytics pipelines, running multiple downst
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ```mermaid
 flowchart TD
@@ -66,19 +66,19 @@ flowchart TD
 
 ---
 
-## ✨ Key Features
+## Key Features
 
-- **🧩 Dual Decoding Engine (CPU / GPU):** Run on lightweight CPU instances or scale up with NVIDIA GPUs (NVDEC + Triton).
-- **🚀 Bypasses OpenCV `VideoCapture`:** Feeds pre-decoded frame matrices straight into **Ultralytics YOLO** (`yolov8`/`yolov11`) and OpenCV scripts.
-- **☸️ Cloud-Native & Kubernetes Ready:** Easily deployable via Helm, supporting Pod auto-scaling and stream partition load balancing.
-- **📡 Single-Connection Ingestion:** Eliminates redundant RTSP connections to MediaMTX per camera stream.
-- **⏱️ Smart Per-Analytic FPS Governor:** Dynamically samples frames per consumer demand (e.g. 2 FPS vs 30 FPS), dropping unneeded processing instantly.
-- **⚡ Zero-Copy Shared Memory (SHM & CUDA IPC):** Publish decoded raw matrices directly into POSIX shared memory or GPU VRAM for microsecond latency.
-- **🤖 Native Triton Inference Integration:** Direct tensor streaming to NVIDIA Triton Inference Server without CPU-GPU host copies.
+- **Dual Decoding Engine (CPU / GPU):** Run on lightweight CPU instances or scale up with NVIDIA GPUs (NVDEC + Triton).
+- **Bypasses OpenCV `VideoCapture`:** Feeds pre-decoded frame matrices straight into **Ultralytics YOLO** (`yolov8`/`yolov11`) and OpenCV scripts.
+- **Cloud-Native & Kubernetes Ready:** Easily deployable via Helm, supporting Pod auto-scaling and stream partition load balancing.
+- **Single-Connection Ingestion:** Eliminates redundant RTSP connections to MediaMTX per camera stream.
+- **Smart Per-Analytic FPS Governor:** Dynamically samples frames per consumer demand (e.g. 2 FPS vs 30 FPS), dropping unneeded processing instantly.
+- **Zero-Copy Shared Memory (SHM & CUDA IPC):** Publish decoded raw matrices directly into POSIX shared memory or GPU VRAM for microsecond latency.
+- **Native Triton Inference Integration:** Direct tensor streaming to NVIDIA Triton Inference Server without CPU-GPU host copies.
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Component | Technology | Purpose |
 | :--- | :--- | :--- |
@@ -92,7 +92,7 @@ flowchart TD
 
 ---
 
-## 🎛️ Control Plane & Management API
+## Control Plane & Management API
 
 HydraStream includes a high-performance **REST & gRPC Management API** allowing users and orchestrators (e.g. Kubernetes controllers) to dynamically configure streams, adjust target FPS per analytic, and select output delivery modes on the fly.
 
@@ -237,7 +237,7 @@ Exposes real-time Kubernetes node mapping, CPU models, NVIDIA GPU assignments, a
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```text
 HydraStream/
@@ -265,7 +265,7 @@ HydraStream/
 
 ---
 
-## 📦 Cross-Platform Distribution & Deployment Modes
+## Cross-Platform Distribution & Deployment Modes
 
 HydraStream supports **three flexible deployment modes** using the exact same core engine:
 
@@ -282,15 +282,15 @@ flowchart TD
     K8sMode -->|Production Cloud-Native| HelmChart[helm install hydrastream deploy/helm]
 ```
 
-1. **🎒 Standalone Portable Executable (Estilo MediaMTX):**
+1. **Standalone Portable Executable (MediaMTX Style):**
    - **Embedded Web UI (`//go:embed`):** Web Dashboard UI, CSS, JS, and `/chaos-lab` assets are statically compiled *inside* the single executable file.
    - Simply download `hydrastream.zip` (Windows) or `hydrastream.tar.gz` (Linux/macOS), extract, and run `./hydrastream`.
 
-2. **🐳 Container Mode (Docker & Docker Compose):**
+2. **Container Mode (Docker & Docker Compose):**
    - Official Multi-Arch Docker Container (`ghcr.io/your_user/hydrastream:latest`).
    - `docker-compose.yml` stack bringing up MediaMTX, HydraStream, Mock RTSP Camera Generator, and Prometheus/Grafana.
 
-3. **☸️ Kubernetes Cloud-Native Mode (Helm Chart):**
+3. **Kubernetes Cloud-Native Mode (Helm Chart):**
    - Production Helm Chart (`deploy/helm/hydrastream`) with DaemonSet support, Shared Memory volume mounts (`emptyDir: medium: Memory`), and Horizontal Pod Autoscaling (HPA).
 
 | Platform / OS | Single Portable Binary | Distribution Archive | Deployment Mode |
@@ -303,7 +303,7 @@ flowchart TD
 
 ---
 
-## 🚀 Quick Start & 1-Click Local Dev
+## Quick Start & 1-Click Local Dev
 
 ### 1-Click Docker Compose Stack
 
@@ -370,22 +370,22 @@ while True:
 
 ---
 
-## 🛡️ Fault Tolerance & Resilience Guarantees
+## Fault Tolerance & Resilience Guarantees
 
 HydraStream is built for zero-downtime mission-critical video analytics pipelines:
 
-1. **🔒 Zero-Impact Consumer Isolation:**
+1. **Zero-Impact Consumer Isolation:**
    - Consumers map POSIX Shared Memory using `PROT_READ` (Read-Only).
    - If an analytics script (Python/OpenCV/Ultralytics) crashes, freezes, or throws an exception, the core HydraStream decoder engine and other connected analytics remain 100% unaffected.
-2. **📡 Camera Disconnect & Reconnect Handling:**
+2. **Camera Disconnect & Reconnect Handling:**
    - Automatic RTSP reconnection with **Exponential Backoff**.
    - During camera outages, HydraStream injects a synthetic **"No Signal / Camera Offline"** placeholder frame into the ring buffer header, allowing consumers to maintain steady loop execution without blocking or crashing.
-3. **⚡ Lock-Free Buffer Integrity:**
+3. **Lock-Free Buffer Integrity:**
    - Ring buffers utilize lock-free atomic head/tail pointers. Slow consumers automatically drop outdated frames without causing backpressure on upstream video decoding.
 
 ---
 
-## 🧪 Testing, Stress & Chaos Engineering Suite
+## Testing, Stress & Chaos Engineering Suite
 
 HydraStream includes native CLI tooling and a dedicated **Web Chaos Lab (`/chaos-lab`)** to test lock-free concurrency, simulate massive scale, and inject real-time faults into video streams:
 
@@ -400,7 +400,7 @@ make stress-test
 make chaos-test
 ```
 
-### 🔬 Chaos & Stress Lab Web UI (`/chaos-lab`)
+### Chaos & Stress Lab Web UI (`/chaos-lab`)
 
 The HydraStream Web Dashboard includes an interactive **Chaos & Stress Testing Studio**:
 
@@ -421,7 +421,7 @@ flowchart LR
     Core -->|WebSockets Telemetry Stream| LiveCharts
 ```
 
-#### 🎛️ Interactive Controls & Parameters:
+#### Interactive Controls & Parameters:
 
 - **Stress Testing Sliders:**
   - `Simulated Cameras`: Scale dynamically from 1 to 200 RTSP camera streams.
@@ -435,7 +435,7 @@ flowchart LR
 
 ---
 
-## 📋 Roadmap
+## Roadmap
 
 - [ ] **Phase 1:** Core Rust/Go RTSP stream ingest & FFmpeg software matrix decoder.
 - [ ] **Phase 2:** POSIX Shared Memory (SHM) ring buffer implementation for zero-copy IPC.
@@ -446,6 +446,6 @@ flowchart LR
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the [MIT License](LICENSE).
