@@ -457,8 +457,8 @@
     </div>
   </div>
 
-  <!-- Floating Help Icon (Bottom Right Corner) -->
-  <button class="cyber-float-help-btn" onclick="openHelpModal()" title="Pipeline Bottleneck & Telemetry Diagnostics Guide">?</button>
+  <!-- Floating Help Icon (Fixed Bottom Right Corner) -->
+  <button class="cyber-float-help-btn" style="position: fixed !important; bottom: 30px !important; right: 30px !important; left: auto !important; z-index: 999999 !important;" onclick="openHelpModal()" title="Pipeline Bottleneck & Telemetry Diagnostics Guide">?</button>
 
   <!-- Pipeline Bottleneck Diagnostics & Metrics Glossary Modal -->
   <div id="helpDiagnosticsModal" class="cyber-modal-overlay" style="display: none;" onclick="if(event.target.id==='helpDiagnosticsModal') closeHelpModal()">
