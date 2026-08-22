@@ -93,6 +93,23 @@ flowchart TD
 
 ---
 
+## Supported Input Media Sources
+
+HydraStream ingests a wide range of input media sources beyond live IP cameras:
+
+1. **Live Media Streams (Continuous Feed):**
+   - **RTSP:** `rtsp://ip:554/stream` (IP Cameras, ONVIF discovery)
+   - **RTMP:** `rtmp://server/live/stream` (Live broadcasts, OBS Studio)
+   - **WebRTC / WHIP:** Ultra-low latency web stream ingestion
+   - **SRT & HLS:** Secure Reliable Transport & HTTP Live Streaming
+2. **Video Files (Looping Virtual Camera):**
+   - **`.mp4` / `.mkv` / `.avi` / `.mov`:** Ingest local or network video files looped continuously as a virtual camera (ideal for offline analytics benchmarking).
+3. **Image Sequences & Directories:**
+   - **Static Image Files (`.jpg` / `.png`):** Single frame matrix ingestion.
+   - **Image Directory Sequence Watcher:** Ingest a folder of image files (`/path/to/frames/*.jpg`) sequentially as a video feed at a configured FPS.
+
+---
+
 ## Tech Stack
 
 | Component | Technology | Purpose |

@@ -93,6 +93,23 @@ flowchart TD
 
 ---
 
+## Fontes de Mídia de Entrada Suportadas
+
+O HydraStream aceita uma ampla variedade de fontes de mídia além de câmeras IP ao vivo:
+
+1. **Streams ao Vivo (Streaming Contínuo):**
+   - **RTSP:** `rtsp://ip:554/stream` (Câmeras IP padrão, ONVIF discovery)
+   - **RTMP:** `rtmp://servidor/live/stream` (Transmissões ao vivo, OBS Studio)
+   - **WebRTC / WHIP:** Ingestão web de ultra-baixa latência
+   - **SRT & HLS:** Secure Reliable Transport & HTTP Live Streaming
+2. **Arquivos de Vídeo (Câmera Virtual em Loop):**
+   - **`.mp4` / `.mkv` / `.avi` / `.mov`:** Ingestão de arquivos de vídeo locais ou de rede em loop contínuo como uma câmera virtual (ideal para testes de bancada de analíticos sem câmera física).
+3. **Sequências de Imagens & Diretórios:**
+   - **Arquivos de Imagem Estática (`.jpg` / `.png`):** Ingestão de matriz de imagem única.
+   - **Watcher de Diretório de Imagens:** Ingestão sequencial de uma pasta de imagens (`/caminho/para/fotos/*.jpg`) como um feed de vídeo no FPS configurado.
+
+---
+
 ## Stack Tecnológica
 
 | Componente | Tecnologia | Propósito |
