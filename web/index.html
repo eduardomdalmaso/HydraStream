@@ -725,6 +725,32 @@
       return filtered;
     }
 
+    /* Dynamic Threshold Color Helper (Cyan = Normal, Yellow = High Warning, Red = Extreme Critical) */
+    function getThresholdColor(val, metricType) {
+      const num = parseFloat(val) || 0;
+      if (metricType === 'latency') {
+        if (num > 3.5) return 'var(--cb-magenta)'; // Extreme / Critical Problem (Red)
+        if (num > 2.0) return 'var(--cb-yellow)';  // High Usage / Warning (Yellow)
+        return 'var(--cb-cyan)';                   // Normal / Healthy (Cyan)
+      }
+      if (metricType === 'resource_score') {
+        if (num > 90.0) return 'var(--cb-magenta)'; // Extreme Saturated (Red)
+        if (num > 75.0) return 'var(--cb-yellow)';  // High Usage (Yellow)
+        return 'var(--cb-cyan)';                    // Normal (Cyan)
+      }
+      if (metricType === 'network_flow') {
+        if (num < 500) return 'var(--cb-magenta)';  // Critical 0 / Disconnected (Red)
+        if (num < 2000) return 'var(--cb-yellow)';  // Low / Fluctuation (Yellow)
+        return 'var(--cb-cyan)';                    // Stable High Flow (Cyan)
+      }
+      if (metricType === 'load_percent') {
+        if (num > 88.0) return 'var(--cb-magenta)'; // Saturated (Red)
+        if (num > 70.0) return 'var(--cb-yellow)';  // High Load (Yellow)
+        return 'var(--cb-cyan)';                    // Normal (Cyan)
+      }
+      return 'var(--cb-cyan)';
+    }
+
     function renderTable() {
       const tbody = document.getElementById('streamTableBody');
       const filtered = getFilteredStreams();
@@ -767,8 +793,16 @@
           ? st.consumers.map(c => typeof c === 'string' ? c : `${c.analytic_type} @ ${c.target_fps} FPS`).join(' | ') 
           : 'NONE';
 
-        const resScoreFormatted = (st.resource_score || 80).toFixed(1);
-        const netFlowFormatted = (st.network_kbps || 4850).toLocaleString() + ' Kbps';
+        const resScoreVal = st.resource_score || 80;
+        const resScoreFormatted = resScoreVal.toFixed(1);
+        const resScoreColor = getThresholdColor(resScoreVal, 'resource_score');
+
+        const netKbpsVal = st.network_kbps || 4850;
+        const netFlowFormatted = netKbpsVal.toLocaleString() + ' Kbps';
+        const netFlowColor = getThresholdColor(netKbpsVal, 'network_flow');
+
+        const latencyVal = parseFloat(st.latency) || 1.42;
+        const latencyColor = getThresholdColor(latencyVal, 'latency');
 
         return `
           <tr onclick="openStreamDrawer('${st.stream_id}')" title="Click to inspect Media Source Parameters & Pipeline Metrics">
@@ -781,16 +815,16 @@
               <div class="text-mono" style="color: var(--cb-cyan); font-size: 0.8rem; margin-top: 0.2rem;">${st.source_url}</div>
             </td>
             <td>
-              <span class="text-mono" style="color: var(--cb-cyan); font-weight: bold;">${netFlowFormatted}</span>
+              <span class="text-mono" style="color: ${netFlowColor}; font-weight: bold;">${netFlowFormatted}</span>
             </td>
             <td>
-              <span class="text-mono" style="color: var(--cb-cyan); font-weight: bold;">${st.latency || '1.42 ms'}</span>
+              <span class="text-mono" style="color: ${latencyColor}; font-weight: bold;">${st.latency || '1.42 ms'}</span>
             </td>
             <td>
-              <span class="text-mono" style="color: var(--cb-yellow); font-weight: bold;">${resScoreFormatted} pts</span>
+              <span class="text-mono" style="color: ${resScoreColor}; font-weight: bold;">${resScoreFormatted} pts</span>
             </td>
             <td>
-              <span class="text-mono" style="color: var(--cb-yellow); font-size: 0.8rem;">${consumersText}</span>
+              <span class="text-mono" style="color: var(--cb-text-main); font-size: 0.8rem;">${consumersText}</span>
             </td>
             <td>
               <span class="text-mono" style="color: var(--cb-green); font-size: 0.75rem;">${st.transport || 'POSIX SHM'}</span>
@@ -808,13 +842,30 @@
       activeDrawerStreamId = streamId;
       const st = rawStreams.find(s => s.stream_id === streamId) || sampleStreams[0];
 
+      const netKbpsVal = st.network_kbps || 4850;
+      const latencyVal = parseFloat(st.latency) || 1.42;
+      const cpuVal = st.cpu_percent || 3.2;
+      const gpuVal = st.gpu_mb || 128.5;
+
       document.getElementById('drawerStreamTitle').innerText = `// ${st.stream_id.toUpperCase()}`;
       document.getElementById('drawerTenantSubtitle').innerText = `TENANT: ${st.tenant_id}`;
       document.getElementById('drawerSourceUrl').value = st.source_url;
-      document.getElementById('drawerNetKbps').innerText = `${(st.network_kbps || 4850).toLocaleString()} Kbps`;
-      document.getElementById('drawerLatency').innerText = st.latency || '1.42 ms';
-      document.getElementById('drawerCpu').innerText = `${st.cpu_percent || 3.2}%`;
-      document.getElementById('drawerGpu').innerText = `${st.gpu_mb || 128.5} MB`;
+
+      const elNet = document.getElementById('drawerNetKbps');
+      elNet.innerText = `${netKbpsVal.toLocaleString()} Kbps`;
+      elNet.style.color = getThresholdColor(netKbpsVal, 'network_flow');
+
+      const elLat = document.getElementById('drawerLatency');
+      elLat.innerText = st.latency || '1.42 ms';
+      elLat.style.color = getThresholdColor(latencyVal, 'latency');
+
+      const elCpu = document.getElementById('drawerCpu');
+      elCpu.innerText = `${cpuVal}%`;
+      elCpu.style.color = getThresholdColor(cpuVal, 'load_percent');
+
+      const elGpu = document.getElementById('drawerGpu');
+      elGpu.innerText = `${gpuVal} MB`;
+      elGpu.style.color = 'var(--cb-cyan)';
 
       document.getElementById('drawerOverlay').style.display = 'flex';
     }
