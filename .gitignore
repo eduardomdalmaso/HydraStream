@@ -1,0 +1,38 @@
+# GitIgnore for HydraStream Project
+
+# Agent Private Rules, Skills, and Customizations (Local Only - DO NOT PUSH)
+.gemini/
+.agents/
+_agents/
+
+# Binary & Build Artifacts
+bin/
+target/
+*.so
+*.a
+*.o
+*.dylib
+*.exe
+*.dll
+
+# Python Build & Cache Artifacts
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Shared Memory temporary files
+/dev/shm/hs_shm_*
+
+# Environment & Secrets
+.env
+.env.local
+*.pem
+*.key
+
+# IDE & System Files
+.idea/
+.vscode/
+.DS_Store
