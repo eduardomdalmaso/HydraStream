@@ -248,7 +248,7 @@
                 <span class="text-mono" style="color: var(--cb-cyan); font-weight: bold;">CONSUMER: YOLOv8_DETECTOR</span>
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem;">
                   <span class="text-mono" style="color: var(--cb-text-muted);">TARGET FPS: <strong id="fpsValYolo" style="color: var(--cb-yellow);">5 FPS</strong></span>
-                  <input type="range" min="1" max="30" value="5" oninput="document.getElementById('fpsValYolo').innerText = this.value + ' FPS'">
+                  <input type="range" id="inputYoloFps" min="1" max="30" value="5" oninput="document.getElementById('fpsValYolo').innerText = this.value + ' FPS'">
                 </div>
               </div>
 
@@ -256,11 +256,11 @@
                 <span class="text-mono" style="color: var(--cb-cyan); font-weight: bold;">CONSUMER: LPR_OCR_READER</span>
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem;">
                   <span class="text-mono" style="color: var(--cb-text-muted);">TARGET FPS: <strong id="fpsValLpr" style="color: var(--cb-yellow);">2 FPS</strong></span>
-                  <input type="range" min="1" max="30" value="2" oninput="document.getElementById('fpsValLpr').innerText = this.value + ' FPS'">
+                  <input type="range" id="inputLprFps" min="1" max="30" value="2" oninput="document.getElementById('fpsValLpr').innerText = this.value + ' FPS'">
                 </div>
               </div>
 
-              <button class="cyber-btn cyber-btn-primary" style="width: 100%; margin-top: 0.5rem;" onclick="alert('FPS Governor throttles updated via REST API!')">APPLY DYNAMIC THROTTLE</button>
+              <button class="cyber-btn cyber-btn-primary" style="width: 100%; margin-top: 0.5rem;" onclick="applyThrottleFromUi()">APPLY DYNAMIC THROTTLE (PATCH API)</button>
             </div>
           </div>
         </div>
@@ -419,6 +419,33 @@
           </tr>
         `;
       }).join('');
+    }
+
+    async function applyThrottleFromUi() {
+      const streamId = document.getElementById('tunerStreamSelect').value;
+      const yoloFps = parseFloat(document.getElementById('inputYoloFps').value) || 5;
+      const lprFps = parseFloat(document.getElementById('inputLprFps').value) || 2;
+
+      try {
+        // Send PATCH to YOLO consumer
+        await fetch(`/api/v1/streams/${streamId}/consumers/yolo_detector`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_fps: yoloFps })
+        });
+
+        // Send PATCH to LPR consumer
+        await fetch(`/api/v1/streams/${streamId}/consumers/lpr_ocr`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_fps: lprFps })
+        });
+
+        alert(`PATCH HTTP 200 OK: Updated ${streamId} throttles (YOLO: ${yoloFps} FPS | LPR: ${lprFps} FPS)`);
+        loadStreams();
+      } catch (err) {
+        alert('Error connecting to backend API: ' + err);
+      }
     }
 
     function updateHashRoute() {
