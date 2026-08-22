@@ -575,36 +575,58 @@ h3, .text-h3 {
   to { transform: translateX(0); }
 }
 
-/* Cyberpunk Floating Help Button (Bottom Right) */
+/* Cyberpunk 2077 Night City Floating Help HUD Button (Bottom Right) */
 .cyber-float-help-btn {
   position: fixed !important;
   bottom: 30px !important;
   right: 30px !important;
   left: auto !important;
   top: auto !important;
-  width: 52px !important;
-  height: 52px !important;
-  background-color: var(--cb-bg-surface) !important;
+  height: 48px !important;
+  padding: 0 1.25rem !important;
+  background-color: #07080c !important;
   color: var(--cb-cyan) !important;
-  border: 2px solid var(--cb-cyan) !important;
-  box-shadow: 0 0 20px rgba(0, 240, 255, 0.5) !important;
+  border: 1.5px solid var(--cb-cyan) !important;
+  border-right: 3px solid var(--cb-yellow) !important;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.4), inset 0 0 10px rgba(0, 240, 255, 0.15) !important;
   font-family: var(--font-display) !important;
-  font-size: 1.5rem !important;
-  font-weight: 900 !important;
+  font-size: 0.85rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
   display: flex !important;
   align-items: center !important;
-  justify-content: center !important;
+  gap: 0.5rem !important;
   cursor: pointer !important;
   z-index: 999999 !important;
   transition: all 0.2s ease !important;
-  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%) !important;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px)) !important;
+}
+
+.cyber-float-help-btn::before {
+  content: '?' !important;
+  display: inline-block !important;
+  font-family: var(--font-mono) !important;
+  font-size: 1.1rem !important;
+  font-weight: 900 !important;
+  color: #000 !important;
+  background-color: var(--cb-cyan) !important;
+  padding: 0.1rem 0.45rem !important;
+  margin-right: 0.25rem !important;
+  clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 0 100%) !important;
 }
 
 .cyber-float-help-btn:hover {
   background-color: var(--cb-cyan) !important;
   color: #000 !important;
-  box-shadow: 0 0 30px rgba(0, 240, 255, 0.9) !important;
-  transform: scale(1.1) !important;
+  border-color: var(--cb-yellow) !important;
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.9), 0 0 10px rgba(252, 238, 10, 0.8) !important;
+  transform: scale(1.05) translateY(-2px) !important;
+}
+
+.cyber-float-help-btn:hover::before {
+  background-color: #000 !important;
+  color: var(--cb-cyan) !important;
 }
 
 /* System Alerts Hub Container */
