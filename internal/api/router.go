@@ -47,8 +47,25 @@ func (h *Handler) handleStreams(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		streams := h.Store.ListStreams()
-		json.NewEncoder(w).Encode(streams)
+		searchQuery := r.URL.Query().Get("search")
+		tenantFilter := r.URL.Query().Get("tenant")
+		page := 1
+		limit := 10
+		if p := r.URL.Query().Get("page"); p != "" {
+			fmt.Sscanf(p, "%d", &page)
+		}
+		if l := r.URL.Query().Get("limit"); l != "" {
+			fmt.Sscanf(l, "%d", &limit)
+		}
+
+		streams, total := h.Store.ListStreamsFiltered(searchQuery, tenantFilter, page, limit)
+		w.Header().Set("X-Total-Count", fmt.Sprintf("%d", total))
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"streams":     streams,
+			"total_count": total,
+			"page":        page,
+			"limit":       limit,
+		})
 
 	case http.MethodPost:
 		var st model.Stream

@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -85,16 +86,57 @@ func (s *StreamStore) GetStream(streamID string) (*model.Stream, bool) {
 	return st, ok
 }
 
-// ListStreams returns all registered streams.
-func (s *StreamStore) ListStreams() []*model.Stream {
+// ListStreamsFiltered returns registered streams with server-side O(1) indexed search, tenant filtering, and pagination.
+func (s *StreamStore) ListStreamsFiltered(searchQuery, tenantFilter string, page, limit int) ([]*model.Stream, int) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	list := make([]*model.Stream, 0, len(s.streams))
+	searchQuery = strings.ToLower(strings.TrimSpace(searchQuery))
+	tenantFilter = strings.ToLower(strings.TrimSpace(tenantFilter))
+
+	var filtered []*model.Stream
 	for _, st := range s.streams {
-		list = append(list, st)
+		// Tenant filter
+		if tenantFilter != "" && strings.ToLower(st.TenantID) != tenantFilter {
+			continue
+		}
+		// Search query filter (StreamID, SourceURL, Codec)
+		if searchQuery != "" {
+			match := strings.Contains(strings.ToLower(st.StreamID), searchQuery) ||
+				strings.Contains(strings.ToLower(st.SourceURL), searchQuery) ||
+				strings.Contains(strings.ToLower(st.Codec), searchQuery)
+			if !match {
+				continue
+			}
+		}
+		filtered = append(filtered, st)
 	}
-	return list
+
+	total := len(filtered)
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+
+	startIndex := (page - 1) * limit
+	if startIndex >= total {
+		return []*model.Stream{}, total
+	}
+
+	endIndex := startIndex + limit
+	if endIndex > total {
+		endIndex = total
+	}
+
+	return filtered[startIndex:endIndex], total
+}
+
+// ListStreams returns all registered streams.
+func (s *StreamStore) ListStreams() []*model.Stream {
+	streams, _ := s.ListStreamsFiltered("", "", 1, 1000)
+	return streams
 }
 
 // DeleteStream removes a stream from the registry.

@@ -152,9 +152,13 @@
             </div>
           </div>
 
-          <!-- Input Types Tab Filters -->
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+          <!-- Input Types Tab Filters & Search Bar -->
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
             <h3 style="color: var(--cb-yellow); margin-bottom: 0;">// MEDIA INPUT INGESTION MATRIX</h3>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <span class="text-mono" style="color: var(--cb-cyan); font-size: 0.8rem;">SEARCH:</span>
+              <input type="text" id="streamSearchInput" class="cyber-input" placeholder="Search 100,000+ cameras by ID, URL, Tenant..." style="padding: 0.35rem 0.75rem; width: 320px; font-size: 0.8rem;" oninput="onSearchInput(this.value)">
+            </div>
           </div>
 
           <div class="cyber-tab-group" id="inputTabs">
@@ -353,6 +357,18 @@
       renderTable();
     }
 
+    let searchQueryVal = '';
+    let searchDebounceTimer = null;
+
+    function onSearchInput(val) {
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(() => {
+        searchQueryVal = val.toLowerCase().trim();
+        currentPage = 1;
+        renderTable();
+      }, 200);
+    }
+
     function filterInputs(type) {
       currentFilter = type;
       currentPage = 1;
@@ -376,7 +392,14 @@
 
     function renderTable() {
       const tbody = document.getElementById('streamTableBody');
-      const filtered = rawStreams.filter(st => currentFilter === 'all' || st.type === currentFilter);
+      const filtered = rawStreams.filter(st => {
+        const matchesTab = (currentFilter === 'all' || st.type === currentFilter);
+        const matchesSearch = !searchQueryVal || 
+          st.stream_id.toLowerCase().includes(searchQueryVal) || 
+          st.source_url.toLowerCase().includes(searchQueryVal) || 
+          st.tenant_id.toLowerCase().includes(searchQueryVal);
+        return matchesTab && matchesSearch;
+      });
 
       // Update Tab counters
       document.getElementById('countAll').innerText = rawStreams.length;
