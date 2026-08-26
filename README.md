@@ -2,7 +2,7 @@
 
 > **High-performance, zero-overhead frame fan-out & decoding pipeline for computer vision and Triton analytics in Go & Rust.**
 
-[ **English** ] | [ **Português do Brasil** ](README.pt-BR.md)
+[**English**] | [**Português do Brasil**](README.pt-BR.md)
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
@@ -178,12 +178,14 @@ curl -X PATCH http://localhost:8080/api/v1/streams/cam_entrance_01/consumers/lpr
 
 - **Single JPEG Snapshot (`GET /api/v1/streams/{stream_id}/snapshot.jpg`):**
   Encodes the latest raw frame directly from the POSIX SHM ring buffer to JPEG in memory via Rust (zero impact on video stream decoding performance).
+
   ```bash
   curl -o snapshot.jpg http://localhost:8080/api/v1/streams/cam_entrance_01/snapshot.jpg
   ```
 
 - **Live MJPEG Web Stream (`GET /api/v1/streams/{stream_id}/mjpeg`):**
   Streams continuous JPEG frames over a single HTTP connection. Directly embeddable in any HTML page with **zero JavaScript**:
+
   ```html
   <!-- Zero-JS Live Video Preview in Web UI -->
   <img src="http://localhost:8080/api/v1/streams/cam_entrance_01/mjpeg?fps=5" alt="Live Camera Preview" />
@@ -259,7 +261,7 @@ Exposes real-time Kubernetes node mapping, CPU models, NVIDIA GPU assignments, a
 - `GET /readyz` - Readiness probe (verifies MediaMTX & SHM subsystem readiness)
 - `GET /metrics` - Prometheus metrics exporter (Ingest FPS, Consumer FPS, decode latency, SHM drops)
 
-### Supported Output Formats:
+### Supported Output Formats
 
 | Output Format | Description | Target Use Case |
 | :--- | :--- | :--- |
@@ -457,7 +459,7 @@ flowchart LR
     Core -->|WebSockets Telemetry Stream| LiveCharts
 ```
 
-#### Interactive Controls & Parameters:
+#### Interactive Controls & Parameters
 
 - **Stress Testing Sliders:**
   - `Simulated Cameras`: Scale dynamically from 1 to 200 RTSP camera streams.

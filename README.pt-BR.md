@@ -2,7 +2,7 @@
 
 > **Pipeline de alta performance e consumo zero de CPU para decodificação e distribuição de frames de câmeras para visão computacional e Triton analytics em Go & Rust.**
 
-[ **English** ](README.md) | [ **Português do Brasil** ]
+[**English**](README.md) | [**Português do Brasil**]
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
@@ -178,12 +178,14 @@ curl -X PATCH http://localhost:8080/api/v1/streams/cam_portaria_01/consumers/lpr
 
 - **Snapshot Único JPEG (`GET /api/v1/streams/{stream_id}/snapshot.jpg`):**
   Codifica a matriz mais recente da SHM para JPEG em memória via Rust (impacto zero na decodificação do vídeo).
+
   ```bash
   curl -o snapshot.jpg http://localhost:8080/api/v1/streams/cam_portaria_01/snapshot.jpg
   ```
 
 - **Stream Ao Vivo MJPEG (`GET /api/v1/streams/{stream_id}/mjpeg`):**
   Transmite frames JPEG contínuos em uma única conexão HTTP. Incorporável em qualquer página HTML com **Zero JavaScript**:
+
   ```html
   <!-- Preview ao Vivo em HTML sem JavaScript -->
   <img src="http://localhost:8080/api/v1/streams/cam_portaria_01/mjpeg?fps=5" alt="Preview da Câmera" />
@@ -259,7 +261,7 @@ Exibe o mapeamento em tempo real dos Nós do Kubernetes, modelos de CPU, GPUs NV
 - `GET /readyz` - Probe de Readiness (Valida subsistema MediaMTX & SHM)
 - `GET /metrics` - Exporter de métricas Prometheus
 
-### Formatos de Saída Suportados:
+### Formatos de Saída Suportados
 
 | Formato de Saída | Descrição | Caso de Uso Recomendado |
 | :--- | :--- | :--- |
@@ -457,7 +459,7 @@ flowchart LR
     Core -->|Stream WebSockets Telemetria| LiveCharts
 ```
 
-#### Controles & Parâmetros Interativos:
+#### Controles & Parâmetros Interativos
 
 - **Sliders de Teste de Estresse:**
   - `Câmeras Simuladas`: Escala de 1 a 200 streams RTSP simultâneos.
