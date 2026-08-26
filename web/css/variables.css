@@ -1,0 +1,53 @@
+/* ==========================================================================
+   CYBERPUNK DESIGN SYSTEM - TOKENS & VARIABLES
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@600;700;800&family=Orbitron:wght@700;800;900&family=Share+Tech+Mono&family=Teko:wght@600;700&display=swap');
+
+:root {
+  /* Fonts */
+  --font-display: 'Orbitron', sans-serif;
+  --font-heading: 'Teko', sans-serif;
+  --font-body: 'Barlow', sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+
+  /* Dark Theme Palette */
+  --cb-bg-void: #07080c;
+  --cb-bg-surface: #0e1017;
+  --cb-bg-elevated: #161924;
+  --cb-border-dim: #232736;
+
+  /* Neon Accent Tokens */
+  --cb-cyan: #00f0ff;
+  --cb-yellow: #fcee0a;
+  --cb-magenta: #ff0055;
+  --cb-green: #00ff66;
+  --cb-amber: #ffaa00;
+
+  /* Exclusive Typography Tokens */
+  --cb-title-color: #00f0ff;
+  --cb-card-title-color: #94a3b8;
+  --cb-table-header-color: #f59e0b;
+  --cb-text-main: #f0f2f5;
+  --cb-text-muted: #8b94a7;
+
+  /* HUD Overlays */
+  --cb-grid-line: rgba(0, 240, 255, 0.04);
+}
+
+[data-theme="light"] {
+  --cb-bg-void: #e6e9f0;
+  --cb-bg-surface: #ffffff;
+  --cb-bg-elevated: #f0f3f8;
+  --cb-border-dim: #cbd2e1;
+  --cb-cyan: #0088cc;
+  --cb-yellow: #d4a000;
+  --cb-magenta: #d9004c;
+  --cb-green: #00a843;
+  --cb-amber: #d97700;
+  --cb-title-color: #0088cc;
+  --cb-card-title-color: #475569;
+  --cb-table-header-color: #d97700;
+  --cb-text-main: #0e1017;
+  --cb-text-muted: #5a6478;
+}

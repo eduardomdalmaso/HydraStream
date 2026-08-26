@@ -1,0 +1,56 @@
+/* ==========================================================================
+   FLOATING HELP BUTTON & CYBERPUNK HELP MODAL
+   ========================================================================== */
+
+.cyber-float-help-btn {
+  position: fixed !important;
+  bottom: 1.5rem !important;
+  right: 1.5rem !important;
+  background-color: var(--cb-bg-elevated) !important;
+  color: var(--cb-cyan) !important;
+  border: 1px solid var(--cb-cyan) !important;
+  padding: 0.6rem 1rem !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.85rem !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  z-index: 999999 !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.2) !important;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)) !important;
+}
+
+.cyber-float-help-btn:hover {
+  background-color: var(--cb-cyan) !important;
+  color: #000 !important;
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.8) !important;
+  transform: scale(1.05) translateY(-2px) !important;
+}
+
+.help-section-box {
+  background-color: var(--cb-bg-elevated);
+  border: 1px solid var(--cb-border-dim);
+  border-left: 3px solid var(--cb-cyan);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.help-section-title {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: var(--cb-yellow);
+  margin-bottom: 0.5rem;
+}
+
+.help-bullet-item {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--cb-text-main);
+  margin-bottom: 0.35rem;
+  line-height: 1.4;
+}
+
+.help-bullet-item strong {
+  font-family: var(--font-mono);
+}

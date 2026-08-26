@@ -1,0 +1,22 @@
+/* ==========================================================================
+   TELEMETRY SVG CHARTS & HUD PULSE ANIMATIONS
+   ========================================================================== */
+
+.chart-container-svg {
+  width: 100%;
+  height: 160px;
+  position: relative;
+  background: rgba(14, 16, 23, 0.95);
+  border: 1px solid var(--cb-border-dim);
+  overflow: hidden;
+}
+
+@keyframes pulseDot {
+  0% { r: 3px; opacity: 0.6; }
+  50% { r: 6px; opacity: 1; }
+  100% { r: 3px; opacity: 0.6; }
+}
+
+.hud-pulse {
+  animation: pulseDot 1.8s infinite ease-in-out;
+}

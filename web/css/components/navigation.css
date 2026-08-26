@@ -1,0 +1,83 @@
+/* ==========================================================================
+   NAVIGATION & HEADER COMPONENTS
+   ========================================================================== */
+
+.cyber-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1.5rem;
+  background-color: var(--cb-bg-surface);
+  border-bottom: 1px solid var(--cb-border-dim);
+  border-left: 4px solid var(--cb-cyan);
+}
+
+.cyber-sidebar {
+  width: 240px;
+  background-color: var(--cb-bg-surface);
+  border-right: 1px solid var(--cb-border-dim);
+  padding: 1.25rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.cyber-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 1rem;
+  color: var(--cb-text-muted);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  border-left: 2px solid transparent;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.cyber-nav-item:hover, .cyber-nav-item.active {
+  color: var(--cb-cyan);
+  background-color: rgba(0, 240, 255, 0.05);
+  border-left-color: var(--cb-cyan);
+}
+
+.cyber-tab-group {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.cyber-tab-btn {
+  padding: 0.4rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--cb-text-muted);
+  background-color: var(--cb-bg-surface);
+  border: 1px solid var(--cb-border-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cyber-tab-btn:hover { color: var(--cb-cyan); border-color: var(--cb-cyan); }
+.cyber-tab-btn.active { background-color: var(--cb-yellow); color: #000; border-color: var(--cb-yellow); font-weight: bold; }
+
+/* Header Action Buttons */
+.cyber-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--cb-border-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cyber-btn-primary { background-color: rgba(0, 240, 255, 0.1); color: var(--cb-cyan); border-color: var(--cb-cyan); }
+.cyber-btn-primary:hover { background-color: var(--cb-cyan); color: #000; box-shadow: 0 0 12px rgba(0, 240, 255, 0.6); }
+.cyber-btn-secondary { background-color: var(--cb-bg-elevated); color: var(--cb-text-main); border-color: var(--cb-border-dim); }
+.cyber-btn-secondary:hover { color: var(--cb-yellow); border-color: var(--cb-yellow); }

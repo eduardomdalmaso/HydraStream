@@ -1,0 +1,44 @@
+/* ==========================================================================
+   SLIDE-OUT INSPECTION DRAWER & MODALS
+   ========================================================================== */
+
+.cyber-drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(7, 8, 12, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cyber-drawer {
+  width: 480px;
+  max-width: 90vw;
+  height: 100vh;
+  background-color: var(--cb-bg-surface);
+  border-left: 2px solid var(--cb-yellow);
+  padding: 1.5rem;
+  overflow-y: auto;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.8);
+}
+
+.cyber-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--cb-text-main);
+  background-color: var(--cb-bg-elevated);
+  border: 1px solid var(--cb-border-dim);
+  border-left: 2px solid var(--cb-cyan);
+}
+
+.cyber-input:focus {
+  outline: none;
+  border-color: var(--cb-cyan);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+}

@@ -1,0 +1,32 @@
+/* ==========================================================================
+   VIEW: CONTROL PANEL & TELEMETRY CHARTS
+   ========================================================================== */
+
+.cyber-section-title {
+  font-family: var(--font-display) !important;
+  font-size: 1.1rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: var(--cb-title-color) !important; /* Exclusive #00f0ff Neon Cyan */
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.35) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  margin-bottom: 0.85rem !important;
+}
+
+.cyber-section-title::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 1.1em;
+  background-color: var(--cb-cyan);
+  box-shadow: 0 0 8px var(--cb-cyan);
+}
+
+.text-hud {
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+}

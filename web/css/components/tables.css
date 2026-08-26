@@ -1,0 +1,93 @@
+/* ==========================================================================
+   CYBER TELEMETRY TABLES & PAGINATION
+   ========================================================================== */
+
+.cyber-table-container {
+  background-color: var(--cb-bg-surface);
+  border: 1px solid var(--cb-border-dim);
+  border-left: 3px solid var(--cb-cyan);
+  overflow-x: auto;
+}
+
+.cyber-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.cyber-table th {
+  font-family: var(--font-mono) !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: var(--cb-table-header-color) !important; /* #f59e0b Amber Gold */
+  background-color: var(--cb-bg-elevated) !important;
+  padding: 0.75rem 1rem !important;
+  border-bottom: 2px solid var(--cb-border-dim) !important;
+}
+
+.cyber-table td {
+  padding: 0.75rem 1rem !important;
+  border-bottom: 1px solid var(--cb-border-dim) !important;
+  font-family: var(--font-body) !important;
+  font-size: 0.875rem !important;
+  color: var(--cb-text-main) !important;
+}
+
+.cyber-table tr:hover {
+  background-color: rgba(0, 240, 255, 0.04);
+}
+
+.cyber-table-slim th {
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.725rem !important;
+}
+
+.cyber-table-slim td {
+  padding: 0.4rem 0.75rem !important;
+  font-size: 0.8125rem !important;
+}
+
+.cyber-table-slim tr {
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.cyber-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  background-color: var(--cb-bg-elevated);
+  border-top: 1px solid var(--cb-border-dim);
+}
+
+.pagination-btn {
+  padding: 0.35rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--cb-text-main);
+  background-color: var(--cb-bg-surface);
+  border: 1px solid var(--cb-border-dim);
+  cursor: pointer;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  color: var(--cb-cyan);
+  border-color: var(--cb-cyan);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Exclusive Data Cell Classes */
+.cell-id { font-family: var(--font-mono) !important; font-size: 0.85rem !important; font-weight: 700 !important; color: #7dd3fc !important; }
+.cell-tenant { font-family: var(--font-mono) !important; font-size: 0.75rem !important; color: var(--cb-text-muted) !important; }
+.cell-mono { font-family: var(--font-mono) !important; font-size: 0.825rem !important; color: #cbd5e1 !important; }
+.cell-hardware { font-family: var(--font-mono) !important; font-size: 0.825rem !important; font-weight: 600 !important; color: #fbbf24 !important; }
+.cell-engine { font-family: var(--font-mono) !important; font-size: 0.825rem !important; color: #34d399 !important; }
+.cell-metric { font-family: var(--font-mono) !important; font-size: 0.85rem !important; font-weight: bold !important; color: #e2e8f0 !important; }
+.cell-transport { font-family: var(--font-mono) !important; font-size: 0.75rem !important; color: #a78bfa !important; }

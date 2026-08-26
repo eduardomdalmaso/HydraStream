@@ -1,0 +1,59 @@
+/* ==========================================================================
+   CYBERPUNK DESIGN SYSTEM - BASE & LAYOUT RESET
+   ========================================================================== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--cb-bg-void);
+  color: var(--cb-text-main);
+  line-height: 1.5;
+  overflow-x: hidden;
+  background-image: 
+    linear-gradient(var(--cb-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--cb-grid-line) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cb-bg-void);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cb-border-dim);
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cb-cyan);
+}
+
+.app-container, .cyber-layout {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.main-content {
+  flex: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.cyber-cut-tr {
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+}
+
+.text-mono {
+  font-family: var(--font-mono);
+}
