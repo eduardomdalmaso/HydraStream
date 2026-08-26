@@ -4,20 +4,24 @@ import (
 	"log"
 	"net/http"
 
-	"hydrastream/internal/api"
-	"hydrastream/internal/store"
+	httpAdapter "hydrastream/internal/adapters/primary/http"
+	"hydrastream/internal/adapters/secondary/memory"
+	"hydrastream/internal/application"
 )
 
 func main() {
-	log.Println("[HydraStream] Initializing Control Plane Engine...")
+	log.Println("[HydraStream] Initializing Control Plane Engine (Hexagonal Architecture + DDD)...")
 
-	// Initialize thread-safe in-memory stream store
-	streamStore := store.NewStreamStore()
+	// 1. Driven Adapter (Secondary - Storage)
+	streamRepo := memory.NewStreamRepository()
 
-	// Initialize REST API handlers
-	apiHandler := api.NewHandler(streamStore)
+	// 2. Application Layer (Service / Use Case)
+	streamService := application.NewStreamService(streamRepo)
 
-	// Create ServeMux
+	// 3. Driving Adapter (Primary - HTTP REST API)
+	apiHandler := httpAdapter.NewHandler(streamService)
+
+	// 4. Create ServeMux and register routes
 	mux := http.NewServeMux()
 	apiHandler.RegisterRoutes(mux)
 

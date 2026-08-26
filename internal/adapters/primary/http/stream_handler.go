@@ -1,45 +1,25 @@
-package api
+package http
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
-	"hydrastream/internal/model"
-	"hydrastream/internal/store"
+	"hydrastream/internal/domain"
+	"hydrastream/internal/ports"
 )
 
-// Handler wraps the API handlers and dependencies.
+// Handler wraps primary HTTP adapters and dependencies.
 type Handler struct {
-	Store *store.StreamStore
+	useCase ports.StreamUseCase
 }
 
-// NewHandler initializes API handler dependencies.
-func NewHandler(st *store.StreamStore) *Handler {
-	return &Handler{Store: st}
-}
-
-// RegisterRoutes attaches REST API endpoints to a ServeMux.
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	// API Endpoints
-	mux.HandleFunc("/api/v1/streams", h.handleStreams)
-	mux.HandleFunc("/api/v1/streams/", h.handleStreamByID)
-	mux.HandleFunc("/api/v1/cluster/topology", h.handleClusterTopology)
-	mux.HandleFunc("/api/v1/info", h.handleSystemInfo)
-
-	// Swagger Interactive API Docs
-	mux.HandleFunc("/swagger/", ServeSwaggerUI)
-	mux.HandleFunc("/swagger/doc.json", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(OpenAPI3Spec))
-	})
-
-	// Health & Observability
-	mux.HandleFunc("/healthz", h.handleHealthz)
-	mux.HandleFunc("/readyz", h.handleReadyz)
-	mux.HandleFunc("/metrics", h.handleMetrics)
+// NewHandler initializes HTTP handler adapters.
+func NewHandler(uc ports.StreamUseCase) *Handler {
+	return &Handler{useCase: uc}
 }
 
 func (h *Handler) handleStreams(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +39,12 @@ func (h *Handler) handleStreams(w http.ResponseWriter, r *http.Request) {
 			fmt.Sscanf(l, "%d", &limit)
 		}
 
-		streams, total := h.Store.ListStreamsFiltered(searchQuery, tenantFilter, sortBy, page, limit)
+		streams, total, err := h.useCase.ListStreams(r.Context(), searchQuery, tenantFilter, sortBy, page, limit)
+		if err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+			return
+		}
+
 		w.Header().Set("X-Total-Count", fmt.Sprintf("%d", total))
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"streams":     streams,
@@ -70,16 +55,17 @@ func (h *Handler) handleStreams(w http.ResponseWriter, r *http.Request) {
 		})
 
 	case http.MethodPost:
-		var st model.Stream
+		var st domain.Stream
 		if err := json.NewDecoder(r.Body).Decode(&st); err != nil {
 			http.Error(w, `{"error":"invalid JSON body"}`, http.StatusBadRequest)
 			return
 		}
-		if st.StreamID == "" {
-			http.Error(w, `{"error":"stream_id is required"}`, http.StatusBadRequest)
+
+		if err := h.useCase.RegisterStream(r.Context(), &st); err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
 			return
 		}
-		h.Store.AddOrUpdateStream(&st)
+
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(st)
 
@@ -114,9 +100,13 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 
 	// Route: GET /api/v1/streams/{id}/stats
 	if len(parts) >= 2 && parts[1] == "stats" {
-		st, ok := h.Store.GetStream(streamID)
-		if !ok {
-			http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
+		st, err := h.useCase.GetStream(r.Context(), streamID)
+		if err != nil {
+			if errors.Is(err, domain.ErrStreamNotFound) {
+				http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
+			} else {
+				http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+			}
 			return
 		}
 		json.NewEncoder(w).Encode(st)
@@ -134,7 +124,7 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
 			return
 		}
-		if err := h.Store.UpdateConsumerFPS(streamID, analyticType, req.TargetFPS, req.OutputFormat); err != nil {
+		if err := h.useCase.UpdateConsumer(r.Context(), streamID, analyticType, req.TargetFPS, req.OutputFormat); err != nil {
 			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
 			return
 		}
@@ -144,26 +134,37 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Direct Stream CRUD
-	st, ok := h.Store.GetStream(streamID)
-	if !ok {
-		http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
-		return
-	}
-
 	switch r.Method {
 	case http.MethodGet:
+		st, err := h.useCase.GetStream(r.Context(), streamID)
+		if err != nil {
+			if errors.Is(err, domain.ErrStreamNotFound) {
+				http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
+			} else {
+				http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+			}
+			return
+		}
 		json.NewEncoder(w).Encode(st)
+
 	case http.MethodDelete:
-		h.Store.DeleteStream(streamID)
+		if err := h.useCase.DeleteStream(r.Context(), streamID); err != nil {
+			if errors.Is(err, domain.ErrStreamNotFound) {
+				http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
+			} else {
+				http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+			}
+			return
+		}
 		w.WriteHeader(http.StatusNoContent)
+
 	default:
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 	}
 }
 
-func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamID string) {
+func (h *Handler) handleSnapshot(w http.ResponseWriter, _ *http.Request, _ string) {
 	w.Header().Set("Content-Type", "image/jpeg")
-	// Synthetic 1x1 JPEG placeholder buffer for mock server
 	jpegBytes := []byte{
 		0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
 		0x01, 0x01, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43,
@@ -182,7 +183,7 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 	w.Write(jpegBytes)
 }
 
-func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, streamID string) {
+func (h *Handler) handleMJPEG(w http.ResponseWriter, _ *http.Request, _ string) {
 	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=frame")
 	jpegBytes := []byte{
 		0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
@@ -213,42 +214,21 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, streamID s
 
 func (h *Handler) handleClusterTopology(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	topo := model.ClusterTopology{
-		StreamID: "cam_entrance_01",
-		IngestionNode: model.TopologyNode{
-			NodeName:      "k8s-gpu-node-02",
-			NodeIP:        "10.0.1.45",
-			CPUArch:       "AMD EPYC 7763 64-Core",
-			GPUHardware:   "NVIDIA A100-SXM4-80GB",
-			DecoderEngine: "NVDEC (GPU 0)",
-		},
-		ConsumerRoute: []model.ConsumerRouting{
-			{
-				Analytic:       "yolo_detection",
-				TargetNode:     "k8s-gpu-node-02",
-				SameNode:       true,
-				TransportUsed:  "CUDA_IPC (Zero-Copy VRAM Direct)",
-				TargetHardware: "NVIDIA A100-SXM4-80GB",
-			},
-		},
+	streamID := r.URL.Query().Get("stream_id")
+	topo, err := h.useCase.GetClusterTopology(r.Context(), streamID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+		return
 	}
 	json.NewEncoder(w).Encode(topo)
 }
 
 func (h *Handler) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	info := model.SystemInfo{
-		AppName:       "HydraStream Engine",
-		Version:       "1.0.0",
-		UptimeSeconds: h.Store.UptimeSeconds(),
-		EngineMode:    "nvidia_nvdec",
-		GPUDetected:   true,
-		GPUModel:      "NVIDIA RTX 4090",
-		Features: map[string]bool{
-			"posix_shm":  true,
-			"cuda_ipc":   true,
-			"triton_grpc": true,
-		},
+	info, err := h.useCase.GetSystemInfo(r.Context())
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+		return
 	}
 	json.NewEncoder(w).Encode(info)
 }
