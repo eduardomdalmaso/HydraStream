@@ -51,7 +51,7 @@ flowchart TD
         IngestAdapter[RTSP / TCP Demuxer Adapter]
         StreamService[Stream Application Service & Dynamic Telemetry]
         RESTRouter[HTTP REST API /api/v1/streams]
-        CyberpunkUI[Cyberpunk 2077 HUD Web UI :8080]
+        WebUI[Dashboard Web UI :8080]
     end
 
     subgraph Rust Data Plane [HydraStream Data Engine]
@@ -144,7 +144,7 @@ HydraStream/
 ├── examples/
 │   └── python_consumer.py  # Python OpenCV & YOLO zero-copy consumer example
 ├── bin/                    # Compiled binaries & local MediaMTX server
-├── web/                    # Cyberpunk 2077 HUD Web UI (HTML/CSS/JS < 100 lines/file)
+├── web/                    # Dashboard Web UI (HTML/CSS/JS < 100 lines/file)
 ├── Makefile                # Build, Test, Benchmark, MediaMTX automation
 └── README.md
 ```
@@ -157,7 +157,7 @@ HydraStream/
 ```bash
 make dev
 ```
-> Starts the Go Control Plane & Cyberpunk 2077 HUD Web UI on **`http://localhost:8080`**.
+> Starts the Go Control Plane & Web UI on **`http://localhost:8080`**.
 > Any changes in `web/` reflect instantly upon browser refresh (**F5**)!
 
 ### 2. Run Local MediaMTX RTSP Server (Bundled)
@@ -209,7 +209,7 @@ for frame in reader.stream():
 - [x] **Phase 3:** Smart microsecond FPS Governor and C-ABI FFI export.
 - [x] **Phase 4:** Real-time NVIDIA GPU hardware auto-detection (RTX 5090 / 4090 / CUDA 13.3).
 - [x] **Phase 5:** Python Zero-Copy SDK (`sdk/python`) for Ultralytics YOLO & OpenCV.
-- [x] **Phase 6:** Cyberpunk 2077 HUD Web UI with live SVG Bézier charts and DDD compliance.
+- [x] **Phase 6:** Real-time Dashboard Web UI with live SVG Bézier charts and DDD compliance.
 - [ ] **Phase 7:** Multi-node Kubernetes DaemonSet Helm Chart & Triton gRPC cluster forwarding.
 
 ---

@@ -31,7 +31,7 @@ func main() {
 	mux := http.NewServeMux()
 	apiHandler.RegisterRoutes(mux)
 
-	// Serve Cyberpunk 2077 HUD Web UI files
+	// Serve Web UI files
 	fileServer := http.FileServer(http.Dir("web"))
 	mux.Handle("/", fileServer)
 
