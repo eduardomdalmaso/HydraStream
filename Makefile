@@ -46,6 +46,11 @@ benchmark:
 	@echo "⚡ Running HydraStream Rust Zero-Copy SHM Benchmark..."
 	cargo run --release --manifest-path crates/hydra-engine/Cargo.toml
 
+# Run Side-by-Side Comparison: Traditional vs HydraStream CPU vs HydraStream GPU
+benchmark-compare:
+	@echo "⚡ Running Real-Hardware Benchmark: Traditional vs HydraStream CPU vs HydraStream GPU..."
+	/home/hades/miniconda3/envs/analytics-env/bin/python benchmarks/run_comparison_benchmark.py
+
 # Clean build artifacts
 clean:
 	rm -rf bin/hydrastream

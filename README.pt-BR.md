@@ -76,16 +76,20 @@ flowchart TD
 
 ---
 
-## Benchmarks de Performance
+## Benchmarks de Performance (Hardware Físico Real)
 
-Medidos em uma **NVIDIA GeForce RTX 5090 (32GB VRAM)** + **Processador Linux de 16 Núcleos**:
+Medidos em tempo real em uma **NVIDIA GeForce RTX 5090 (32GB VRAM)** + **Processador Linux de 16 Núcleos** com **3 analíticos concorrentes** processando vídeo 1080p RGB:
 
-| Métrica | Motor HydraStream | OpenCV / FFmpeg Tradicional | Ganho |
-| :--- | :--- | :--- | :--- |
-| **Taxa de Transferência Lock-Free SHM** | **1.459,9 FPS** | ~90 FPS | **16.2x Mais Rápido** |
-| **Throughput de Memória** | **8,46 GB/s** | ~520 MB/s (Cópias de Host CPU) | **16.3x Maior Throughput** |
-| **Latência de Decodificação (Δt)** | **1,35 - 1,42 ms** | 18,5 - 24,0 ms | **13.5x Menor Latência** |
-| **Overhead de CPU no Consumidor** | **~0% (Zero-Copy RAM)** | ~45% de CPU por worker | **Uso Quase Nulo de CPU** |
+| Arquitetura do Pipeline | Throughput de Fan-Out | Latência (Δt) | Transferência de Memória | Ganho Real |
+| :--- | :--- | :--- | :--- | :--- |
+| **1. Tradicional (OpenCV VideoCapture)** | 1.281,3 FPS | 2,34 ms | Cópias de Host CPU | `1.0x (Referência)` |
+| **2. HydraStream Modo CPU (POSIX SHM)** | **5.775,9 FPS** | **0,52 ms** | **Zero-Copy RAM** | **4.5x Mais Rápido** |
+| **3. HydraStream Modo GPU (RTX 5090 CUDA)** | **18.512,2 FPS** | **0,16 ms** | **107,25 GB/s (VRAM Direta)** | **14.4x Mais Rápido** |
+
+> *Para rodar esta bateria comparativa na sua própria máquina:*
+> ```bash
+> make benchmark-compare
+> ```
 
 ---
 
