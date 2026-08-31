@@ -300,7 +300,7 @@ func (s *StreamService) InjectChaos(ctx context.Context, inj *domain.ChaosInject
 	case "gpu_stall":
 		time.Sleep(20 * time.Millisecond)
 		res.RecoveryMs = float64(time.Since(start).Microseconds()) / 1000.0 + 14.2
-		res.Message = fmt.Sprintf("Artificially throttled GPU NVDEC decode pipeline (+20ms Δt). POSIX SHM failover stabilized queue back to 1.42ms.")
+		res.Message = "Artificially throttled GPU NVDEC decode pipeline (+20ms Δt). POSIX SHM failover stabilized queue back to 1.42ms."
 
 	case "shm_overflow":
 		time.Sleep(10 * time.Millisecond)
