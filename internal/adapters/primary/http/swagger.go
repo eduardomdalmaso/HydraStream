@@ -110,6 +110,34 @@ const OpenAPI3Spec = `{
         "responses": { "200": { "description": "Cluster topology" } }
       }
     },
+    "/api/v1/chaos/inject": {
+      "post": {
+        "summary": "Inject real fault/chaos experiment into stream pipeline",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["experiment_type"],
+                "properties": {
+                  "experiment_type": { "type": "string", "enum": ["packet_drop", "disconnect", "gpu_stall", "shm_overflow"] },
+                  "intensity": { "type": "number", "default": 25 },
+                  "stream_id": { "type": "string", "default": "cam_entrance_01" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Chaos experiment outcome and recovery metrics" } }
+      }
+    },
+    "/api/v1/chaos/reset": {
+      "post": {
+        "summary": "Disarm all chaos injection circuits",
+        "responses": { "200": { "description": "Circuits reset" } }
+      }
+    },
     "/healthz": {
       "get": { "summary": "Liveness probe", "responses": { "200": { "description": "OK" } } }
     },

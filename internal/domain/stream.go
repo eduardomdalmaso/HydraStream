@@ -115,6 +115,24 @@ type ControlPanelTelemetry struct {
 	TotalIngestFPS     float64   `json:"total_ingest_fps"`
 }
 
+// ChaosInjection represents a real chaos experiment request.
+type ChaosInjection struct {
+	ExperimentType string  `json:"experiment_type"` // "packet_drop", "disconnect", "gpu_stall", "shm_overflow"
+	Intensity      float64 `json:"intensity"`       // e.g. 25 (%) for packet drop
+	StreamID       string  `json:"stream_id"`
+}
+
+// ChaosResult represents the real-time measured outcome of the chaos injection.
+type ChaosResult struct {
+	ExperimentType string    `json:"experiment_type"`
+	Status         string    `json:"status"` // "injected", "recovered"
+	Message        string    `json:"message"`
+	RecoveryMs     float64   `json:"recovery_ms"`
+	FramesDropped  uint64    `json:"frames_dropped"`
+	JitterDeltaMs  float64   `json:"jitter_delta_ms"`
+	Timestamp      time.Time `json:"timestamp"`
+}
+
 // Validate checks business rules for stream creation/update.
 func (s *Stream) Validate() error {
 	if s.StreamID == "" {

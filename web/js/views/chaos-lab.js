@@ -1,6 +1,8 @@
 /* ==========================================================================
-   HYDRASTREAM CHAOS LAB STUDIO VIEW MODULE
+   HYDRASTREAM CHAOS LAB STUDIO VIEW MODULE (REAL LIVE BACKEND INJECTION)
    ========================================================================== */
+
+import { injectChaosAPI, resetChaosAPI } from '../api.js';
 
 export function logChaos(msg, type = 'info') {
   const consoleEl = document.getElementById('chaosConsoleOutput');
@@ -18,38 +20,51 @@ export function injectPacketLoss(val) {
   if (label) label.innerText = `${val}%`;
 }
 
-export function triggerChaosPacketDrop() {
+export async function triggerChaosPacketDrop() {
   const slider = document.getElementById('packetLossSlider');
-  const val = slider ? slider.value : '25';
-  logChaos(`⚡ [INJECT] Simulating ${val}% packet drop on RTSP ingress...`, 'crit');
-  setTimeout(() => {
-    logChaos(`🛡️ [AUTOPILOT] Dynamic jitter buffer engaged. Recovered in 84ms (0 frame loss).`, 'ok');
-  }, 900);
+  const val = parseFloat(slider ? slider.value : '25');
+  logChaos(`⚡ [INJECT:API] Dispatching ${val}% packet drop to Go Control Plane...`, 'crit');
+  const res = await injectChaosAPI('packet_drop', val);
+  if (res) {
+    logChaos(`🛡️ [BACKEND RESPONSE] ${res.message} (Recovery Δt: ${res.recovery_ms.toFixed(1)}ms)`, 'ok');
+  } else {
+    logChaos(`❌ [FAILED] Backend unreachable for chaos injection.`, 'warn');
+  }
 }
 
-export function triggerChaosDisconnect() {
-  logChaos(`⚠️ [INJECT] Severing RTSP TCP connection on cam_entrance_01...`, 'warn');
-  setTimeout(() => {
-    logChaos(`🔄 [RECONNECT] Auto-reconnect triggered. Handshake OK in 142ms.`, 'ok');
-  }, 1100);
+export async function triggerChaosDisconnect() {
+  logChaos(`⚠️ [INJECT:API] Requesting active socket severing on cam_entrance_01...`, 'warn');
+  const res = await injectChaosAPI('disconnect', 100);
+  if (res) {
+    logChaos(`🔄 [RECONNECT:OK] ${res.message}`, 'ok');
+  } else {
+    logChaos(`❌ [FAILED] Backend unreachable for chaos injection.`, 'warn');
+  }
 }
 
-export function triggerChaosGPUStall() {
-  logChaos(`🔥 [INJECT] Artificially throttling NVDEC GPU decode pipeline (+20ms)...`, 'crit');
-  setTimeout(() => {
-    logChaos(`⚡ [OFFLOAD] CPU POSIX SHM fallback engaged. Queue back to 1.4ms.`, 'ok');
-  }, 1200);
+export async function triggerChaosGPUStall() {
+  logChaos(`🔥 [INJECT:API] Injecting artificial GPU pipeline stall (+20ms Δt)...`, 'crit');
+  const res = await injectChaosAPI('gpu_stall', 20);
+  if (res) {
+    logChaos(`⚡ [FAILOVER:OK] ${res.message} (Recovered in ${res.recovery_ms.toFixed(1)}ms)`, 'ok');
+  } else {
+    logChaos(`❌ [FAILED] Backend unreachable for chaos injection.`, 'warn');
+  }
 }
 
-export function triggerChaosSHMOverflow() {
-  logChaos(`💥 [INJECT] Saturating /dev/shm atomic ring buffer to 95% capacity...`, 'crit');
-  setTimeout(() => {
-    logChaos(`🧹 [RING_BUFFER] Lock-free atomic eviction dropped oldest 3 unconsumed frames. Buffer stabilized at 18%.`, 'ok');
-  }, 1000);
+export async function triggerChaosSHMOverflow() {
+  logChaos(`💥 [INJECT:API] Saturating POSIX /dev/shm ring buffer to 95% capacity...`, 'crit');
+  const res = await injectChaosAPI('shm_overflow', 95);
+  if (res) {
+    logChaos(`🧹 [RING_EVICTION:OK] ${res.message} (Completed in ${res.recovery_ms.toFixed(1)}ms)`, 'ok');
+  } else {
+    logChaos(`❌ [FAILED] Backend unreachable for chaos injection.`, 'warn');
+  }
 }
 
-export function resetChaosLab() {
+export async function resetChaosLab() {
   const consoleEl = document.getElementById('chaosConsoleOutput');
   if (consoleEl) consoleEl.innerHTML = '';
-  logChaos(`✅ Chaos Lab Studio reset. All injection circuits disarmed.`, 'ok');
+  const res = await resetChaosAPI();
+  logChaos(`✅ Chaos Lab Studio reset. ${res ? res.message : 'All circuits disarmed.'}`, 'ok');
 }

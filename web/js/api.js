@@ -1,5 +1,5 @@
 /* ==========================================================================
-   HYDRASTREAM API CLIENT MODULE
+   HYDRASTREAM API CLIENT MODULE (CONNECTING BACKEND REST ENDPOINTS)
    ========================================================================== */
 
 export async function fetchStreamsAPI(search = '', tenant = '', sortBy = '', page = 1, limit = 10) {
@@ -9,7 +9,6 @@ export async function fetchStreamsAPI(search = '', tenant = '', sortBy = '', pag
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     return await res.json();
   } catch (err) {
-    console.warn('[HydraStream API] Live server unavailable, using local state:', err);
     return null;
   }
 }
@@ -17,7 +16,7 @@ export async function fetchStreamsAPI(search = '', tenant = '', sortBy = '', pag
 export async function fetchSystemInfoAPI() {
   try {
     const res = await fetch('/api/v1/info');
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) return null;
     return await res.json();
   } catch (err) {
     return null;
@@ -27,7 +26,7 @@ export async function fetchSystemInfoAPI() {
 export async function fetchTopologyAPI() {
   try {
     const res = await fetch('/api/v1/cluster/topology');
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) return null;
     return await res.json();
   } catch (err) {
     return null;
@@ -37,7 +36,7 @@ export async function fetchTopologyAPI() {
 export async function fetchControlPanelTelemetryAPI() {
   try {
     const res = await fetch('/api/v1/telemetry/stats');
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    if (!res.ok) return null;
     return await res.json();
   } catch (err) {
     return null;
@@ -54,5 +53,29 @@ export async function updateConsumerFPSAPI(streamId, analyticType, targetFPS, fo
     return res.ok;
   } catch (err) {
     return false;
+  }
+}
+
+export async function injectChaosAPI(experimentType, intensity = 25, streamId = 'cam_entrance_01') {
+  try {
+    const res = await fetch('/api/v1/chaos/inject', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ experiment_type: experimentType, intensity, stream_id: streamId })
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    return null;
+  }
+}
+
+export async function resetChaosAPI() {
+  try {
+    const res = await fetch('/api/v1/chaos/reset', { method: 'POST' });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    return null;
   }
 }

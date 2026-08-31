@@ -10,6 +10,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/cluster/topology", h.handleClusterTopology)
 	mux.HandleFunc("/api/v1/telemetry/stats", h.handleControlPanelTelemetry)
 	mux.HandleFunc("/api/v1/info", h.handleSystemInfo)
+	mux.HandleFunc("/api/v1/chaos/inject", h.handleChaosInject)
+	mux.HandleFunc("/api/v1/chaos/reset", h.handleChaosReset)
 
 	// Swagger Interactive API Docs
 	mux.HandleFunc("/swagger/", ServeSwaggerUI)
