@@ -24,6 +24,26 @@ export async function fetchSystemInfoAPI() {
   }
 }
 
+export async function fetchTopologyAPI() {
+  try {
+    const res = await fetch('/api/v1/cluster/topology');
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    return null;
+  }
+}
+
+export async function fetchControlPanelTelemetryAPI() {
+  try {
+    const res = await fetch('/api/v1/telemetry/stats');
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    return null;
+  }
+}
+
 export async function updateConsumerFPSAPI(streamId, analyticType, targetFPS, format) {
   try {
     const res = await fetch(`/api/v1/streams/${streamId}/consumers/${analyticType}`, {

@@ -1,0 +1,73 @@
+/* ==========================================================================
+   VIEW: CLUSTER TOPOLOGY
+   ========================================================================== */
+
+.topology-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.node-card {
+  background-color: var(--cb-bg-surface);
+  border: 1px solid var(--cb-border-dim);
+  border-left: 3px solid var(--cb-cyan);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.node-card.gpu-leader {
+  border-left-color: var(--cb-green);
+}
+
+.node-card.edge-node {
+  border-left-color: var(--cb-yellow);
+}
+
+.node-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.node-title {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: #7dd3fc;
+}
+
+.node-metric-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.775rem;
+  color: var(--cb-text-muted);
+  border-bottom: 1px dashed var(--cb-border-dim);
+  padding: 0.3rem 0;
+}
+
+.node-metric-val {
+  color: var(--cb-text-main);
+  font-weight: bold;
+}
+
+.node-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--cb-bg-elevated);
+  margin-top: 0.25rem;
+  overflow: hidden;
+}
+
+.node-progress-fill {
+  height: 100%;
+  background: var(--cb-cyan);
+  transition: width 0.3s ease;
+}
+
+.node-progress-fill.green { background: var(--cb-green); }
+.node-progress-fill.yellow { background: var(--cb-yellow); }

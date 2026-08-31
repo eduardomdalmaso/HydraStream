@@ -15,4 +15,6 @@ type StreamUseCase interface {
 	UpdateConsumer(ctx context.Context, streamID, analyticType string, targetFPS float64, format string) error
 	GetClusterTopology(ctx context.Context, streamID string) (*domain.ClusterTopology, error)
 	GetSystemInfo(ctx context.Context) (*domain.SystemInfo, error)
+	GetControlPanelTelemetry(ctx context.Context) (*domain.ControlPanelTelemetry, error)
+	GetIngestStats(ctx context.Context, streamID string) (*domain.IngestStats, error)
 }

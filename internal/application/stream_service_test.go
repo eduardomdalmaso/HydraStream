@@ -11,7 +11,7 @@ import (
 
 func TestStreamServiceRegisterAndGet(t *testing.T) {
 	repo := memory.NewStreamRepository()
-	service := application.NewStreamService(repo)
+	service := application.NewStreamService(repo, nil)
 	ctx := context.Background()
 
 	newStream := &domain.Stream{
@@ -36,7 +36,7 @@ func TestStreamServiceRegisterAndGet(t *testing.T) {
 
 func TestStreamServiceDelete(t *testing.T) {
 	repo := memory.NewStreamRepository()
-	service := application.NewStreamService(repo)
+	service := application.NewStreamService(repo, nil)
 	ctx := context.Background()
 
 	err := service.DeleteStream(ctx, "cam_entrance_01")

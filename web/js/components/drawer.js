@@ -1,5 +1,5 @@
 /* ==========================================================================
-   HYDRASTREAM INSPECTION DRAWER MODULE
+   HYDRASTREAM INSPECTION DRAWER MODULE (LIVE STREAM INSPECTION)
    ========================================================================== */
 
 import { state } from '../state.js';
@@ -7,17 +7,12 @@ import { updateConsumerFPSAPI } from '../api.js';
 
 export function openStreamDrawer(streamId) {
   state.activeDrawerStreamId = streamId;
-  const st = (state.rawStreams && state.rawStreams.length > 0)
-    ? state.rawStreams.find(s => s.stream_id === streamId) 
-    : state.sampleStreams[0];
-
+  const st = (state.rawStreams || []).find(s => s.stream_id === streamId);
   if (!st) return;
 
-  const elTitle = document.getElementById('drawerStreamTitle');
-  if (elTitle) elTitle.innerText = `// ${st.stream_id.toUpperCase()}`;
-
-  const elTenant = document.getElementById('drawerTenantSubtitle');
-  if (elTenant) elTenant.innerText = `TENANT: ${st.tenant_id}`;
+  const setTxt = (id, txt) => { const el = document.getElementById(id); if (el) el.innerText = txt; };
+  setTxt('drawerStreamTitle', `// ${st.stream_id.toUpperCase()}`);
+  setTxt('drawerTenantSubtitle', `TENANT: ${st.tenant_id}`);
 
   const elUrl = document.getElementById('drawerSourceUrl');
   if (elUrl) elUrl.value = st.source_url;
@@ -42,9 +37,8 @@ export async function saveConsumerSettings() {
   const success = await updateConsumerFPSAPI(state.activeDrawerStreamId, 'lpr_ocr', fps, fmt);
   if (success) {
     alert(`[HYDRASTREAM] Updated Consumer Sampling for ${state.activeDrawerStreamId}: ${fps} FPS (${fmt})`);
-    closeDrawer();
   } else {
-    alert(`[HYDRASTREAM] Updated locally (Mock Server Mode): ${fps} FPS (${fmt})`);
-    closeDrawer();
+    alert(`[HYDRASTREAM] Failed to update consumer settings on backend.`);
   }
+  closeDrawer();
 }

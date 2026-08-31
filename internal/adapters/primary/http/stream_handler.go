@@ -113,6 +113,21 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Route: GET /api/v1/streams/{id}/ingest
+	if len(parts) >= 2 && parts[1] == "ingest" {
+		stat, err := h.useCase.GetIngestStats(r.Context(), streamID)
+		if err != nil {
+			if errors.Is(err, domain.ErrStreamNotFound) {
+				http.Error(w, `{"error":"stream ingest session not found"}`, http.StatusNotFound)
+			} else {
+				http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+			}
+			return
+		}
+		json.NewEncoder(w).Encode(stat)
+		return
+	}
+
 	// Route: PATCH /api/v1/streams/{id}/consumers/{analytic_type}
 	if len(parts) >= 3 && parts[1] == "consumers" && r.Method == http.MethodPatch {
 		analyticType := parts[2]
@@ -221,6 +236,16 @@ func (h *Handler) handleClusterTopology(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	json.NewEncoder(w).Encode(topo)
+}
+
+func (h *Handler) handleControlPanelTelemetry(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	stats, err := h.useCase.GetControlPanelTelemetry(r.Context())
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(stats)
 }
 
 func (h *Handler) handleSystemInfo(w http.ResponseWriter, r *http.Request) {

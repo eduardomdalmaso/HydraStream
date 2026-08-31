@@ -1,8 +1,9 @@
 /* ==========================================================================
-   HYDRASTREAM TABLE RENDERER MODULE
+   HYDRASTREAM TABLE RENDERER MODULE (LIVE BACKEND STREAM FEED)
    ========================================================================== */
 
-import { state, getFilteredStreams } from '../state.js';
+import { state } from '../state.js';
+import { fetchStreamsAPI } from '../api.js';
 
 export function getThresholdColor(val, metricType) {
   const num = parseFloat(val) || 0;
@@ -12,59 +13,56 @@ export function getThresholdColor(val, metricType) {
   return '#38bdf8';
 }
 
-export function renderStreamTable() {
+export async function renderStreamTable() {
   const tbody = document.getElementById('streamTableBody');
   if (!tbody) return;
 
-  const filtered = getFilteredStreams();
-  const totalItems = filtered.length;
+  const tenantFilter = state.currentTabFilter === 'all' ? '' : state.currentTabFilter;
+  const data = await fetchStreamsAPI(state.searchQuery, tenantFilter, state.sortBy, state.currentPage, state.pageSize);
+  const streams = (data && data.streams) ? data.streams : [];
+  state.rawStreams = streams;
+  const totalItems = (data && typeof data.total_count === 'number') ? data.total_count : streams.length;
   const totalPages = Math.ceil(totalItems / state.pageSize) || 1;
-  if (state.currentPage > totalPages) state.currentPage = totalPages;
+
+  if (state.currentPage > totalPages && totalPages > 0) state.currentPage = totalPages;
 
   const startIndex = (state.currentPage - 1) * state.pageSize;
   const endIndex = Math.min(startIndex + state.pageSize, totalItems);
-  const pageItems = filtered.slice(startIndex, endIndex);
 
-  const elRange = document.getElementById('pageRangeText');
-  if (elRange) elRange.innerText = totalItems > 0 ? `${startIndex + 1}-${endIndex}` : '0-0';
-  const elTotal = document.getElementById('totalItemsText');
-  if (elTotal) elTotal.innerText = totalItems;
-  const elCurrent = document.getElementById('currentPageText');
-  if (elCurrent) elCurrent.innerText = state.currentPage;
-  const elTotalP = document.getElementById('totalPagesText');
-  if (elTotalP) elTotalP.innerText = totalPages;
+  const setTxt = (id, txt) => { const el = document.getElementById(id); if (el) el.innerText = txt; };
+  setTxt('pageRangeText', totalItems > 0 ? `${startIndex + 1}-${endIndex}` : '0-0');
+  setTxt('totalItemsText', totalItems);
+  setTxt('currentPageText', state.currentPage);
+  setTxt('totalPagesText', totalPages);
 
   const btnPrev = document.getElementById('btnPrevPage');
   if (btnPrev) btnPrev.disabled = (state.currentPage <= 1);
   const btnNext = document.getElementById('btnNextPage');
   if (btnNext) btnNext.disabled = (state.currentPage >= totalPages);
 
-  if (!pageItems || pageItems.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="text-mono" style="color: var(--cb-text-muted); text-align: center;">// NO INPUT SOURCES MATCH FILTER</td></tr>';
+  if (streams.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-mono" style="color: var(--cb-text-muted); text-align: center; padding: 2rem;">// NO ACTIVE PIPELINES REGISTERED IN BACKEND</td></tr>';
     return;
   }
 
-  tbody.innerHTML = pageItems.map(st => {
-    const protocolBadge = st.type === 'rtsp' 
-      ? '<span class="badge-protocol">RTSP LIVE</span>' 
-      : (st.type === 'mp4' ? '<span class="badge-protocol mp4">MP4 LOOP</span>' : '<span class="badge-protocol imageseq">IMAGE SEQ</span>');
-
-    const consumersText = Array.isArray(st.consumers) 
-      ? st.consumers.map(c => typeof c === 'string' ? c : `${c.analytic_type} @ ${c.target_fps} FPS`).join(' | ') 
-      : 'NONE';
-
-    const resScoreVal = st.resource_score || 80;
-    const netKbpsVal = st.network_kbps || 4850;
+  tbody.innerHTML = streams.map(st => {
+    const isRTSP = st.source_url.startsWith('rtsp://');
+    const isMP4 = st.source_url.startsWith('file://') || st.source_url.endsWith('.mp4');
+    const badge = isRTSP ? '<span class="badge-protocol">RTSP LIVE</span>' : (isMP4 ? '<span class="badge-protocol mp4">MP4 LOOP</span>' : '<span class="badge-protocol imageseq">SYNTHETIC SHM</span>');
+    const consumers = Array.isArray(st.consumers) && st.consumers.length > 0 ? st.consumers.map(c => `${c.analytic_type} @ ${c.target_fps} FPS`).join(' | ') : 'NONE';
+    const score = st.resource_score || 80.0;
+    const netKbps = st.network_kbps || 4850;
+    const latency = st.decode_latency_ms || 1.42;
 
     return `
       <tr onclick="window.openStreamDrawer('${st.stream_id}')" title="Click to inspect Media Source Parameters">
         <td><div class="cell-id">${st.stream_id.toUpperCase()}</div><span class="cell-tenant">${st.tenant_id}</span></td>
-        <td>${protocolBadge}<div class="cell-mono" style="margin-top: 0.2rem;">${st.source_url}</div></td>
-        <td><span class="cell-metric" style="color: ${getThresholdColor(netKbpsVal, 'network_flow')};">${netKbpsVal.toLocaleString()} Kbps</span></td>
-        <td><span class="cell-metric" style="color: ${getThresholdColor(st.latency || 1.42, 'latency')};">${st.latency || '1.42 ms'}</span></td>
-        <td><span class="cell-metric" style="color: ${getThresholdColor(resScoreVal, 'resource_score')};">${resScoreVal.toFixed(1)} pts</span></td>
-        <td><span class="cell-mono" style="font-size: 0.8rem;">${consumersText}</span></td>
-        <td><span class="cell-transport">${st.transport || 'POSIX SHM'}</span></td>
+        <td>${badge}<div class="cell-mono" style="margin-top: 0.2rem;">${st.source_url}</div></td>
+        <td><span class="cell-metric" style="color: ${getThresholdColor(netKbps, 'network_flow')};">${netKbps.toLocaleString()} Kbps</span></td>
+        <td><span class="cell-metric" style="color: ${getThresholdColor(latency, 'latency')};">${latency.toFixed(2)} ms</span></td>
+        <td><span class="cell-metric" style="color: ${getThresholdColor(score, 'resource_score')};">${score.toFixed(1)} pts</span></td>
+        <td><span class="cell-mono" style="font-size: 0.8rem;">${consumers}</span></td>
+        <td><span class="cell-transport">${st.decoding_engine || 'POSIX SHM'}</span></td>
         <td><span class="status-badge">${st.status || 'ONLINE'}</span></td>
       </tr>
     `;

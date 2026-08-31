@@ -12,3 +12,6 @@
 @import './components/help.css';
 @import './components/charts.css';
 @import './views/control-panel.css';
+@import './views/chaos-lab.css';
+@import './views/cluster-topology.css';
+@import './views/telemetry-logs.css';

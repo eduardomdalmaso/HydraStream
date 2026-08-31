@@ -7,6 +7,8 @@ _agents/
 
 # Binary & Build Artifacts
 bin/
+mediamtx
+mediamtx.yml
 target/
 *.so
 *.a
@@ -31,6 +33,7 @@ build/
 .env.local
 *.pem
 *.key
+*.crt
 
 # IDE & System Files
 .idea/

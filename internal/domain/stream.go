@@ -35,6 +35,18 @@ type Stream struct {
 	CreatedAt      time.Time  `json:"created_at"`
 }
 
+// IngestStats represents real-time stream ingestion telemetry.
+type IngestStats struct {
+	StreamID      string    `json:"stream_id"`
+	Status        string    `json:"status"` // "connecting", "streaming", "reconnecting", "stopped"
+	IngestFPS     float64   `json:"ingest_fps"`
+	BitrateKbps   float64   `json:"bitrate_kbps"`
+	FramesTotal   uint64    `json:"frames_total"`
+	BytesTotal    uint64    `json:"bytes_total"`
+	LastFrameTime time.Time `json:"last_frame_time"`
+	ErrorMsg      string    `json:"error_msg,omitempty"`
+}
+
 // SystemInfo represents basic non-sensitive engine status.
 type SystemInfo struct {
 	AppName       string          `json:"app_name"`
@@ -64,11 +76,43 @@ type ConsumerRouting struct {
 	TargetHardware string `json:"target_hardware"`
 }
 
+// ClusterNode represents a compute worker node in the topology cluster.
+type ClusterNode struct {
+	NodeName      string  `json:"node_name"`
+	NodeIP        string  `json:"node_ip"`
+	CPUArch       string  `json:"cpu_architecture"`
+	GPUHardware   string  `json:"gpu_hardware"`
+	DecoderEngine string  `json:"decoder_engine"`
+	Status        string  `json:"status"`
+	LoadPercent   float64 `json:"load_percent"`
+	MemoryPercent float64 `json:"memory_percent"`
+	ActiveStreams string  `json:"active_streams"`
+	NodeType      string  `json:"node_type"`
+}
+
 // ClusterTopology represents cluster hardware topology.
 type ClusterTopology struct {
 	StreamID      string            `json:"stream_id"`
 	IngestionNode TopologyNode      `json:"ingestion_node"`
 	ConsumerRoute []ConsumerRouting `json:"consumer_routing"`
+	Nodes         []ClusterNode     `json:"nodes"`
+}
+
+// ControlPanelTelemetry aggregates real runtime metrics for the live dashboard.
+type ControlPanelTelemetry struct {
+	HealthScore        float64   `json:"health_score"`
+	SLAStatus          string    `json:"sla_status"`
+	ActiveClusterNodes string    `json:"active_cluster_nodes"`
+	NodesSummary       string    `json:"nodes_summary"`
+	AvgDecodeLatencyMs float64   `json:"avg_decode_latency_ms"`
+	DecoderEngineName  string    `json:"decoder_engine_name"`
+	POSIXShmOccupancy  float64   `json:"posix_shm_occupancy"`
+	ShmLockFreeStatus  string    `json:"shm_lock_free_status"`
+	PeakBandwidthMbps  float64   `json:"peak_bandwidth_mbps"`
+	BandwidthHistory   []float64 `json:"bandwidth_history"`
+	LatencyHistory     []float64 `json:"latency_history"`
+	ActiveStreamsCount int       `json:"active_streams_count"`
+	TotalIngestFPS     float64   `json:"total_ingest_fps"`
 }
 
 // Validate checks business rules for stream creation/update.

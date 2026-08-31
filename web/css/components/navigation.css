@@ -1,5 +1,5 @@
 /* ==========================================================================
-   NAVIGATION & HEADER COMPONENTS
+   NAVIGATION & HEADER COMPONENTS (CYBERPUNK 2077 HUD)
    ========================================================================== */
 
 .cyber-header {
@@ -51,33 +51,37 @@
   padding: 0.4rem 1rem;
   font-family: var(--font-mono);
   font-size: 0.8rem;
+  font-weight: 600;
   color: var(--cb-text-muted);
   background-color: var(--cb-bg-surface);
   border: 1px solid var(--cb-border-dim);
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.cyber-tab-btn:hover { color: var(--cb-cyan); border-color: var(--cb-cyan); }
+.cyber-tab-btn:hover { color: var(--cb-cyan); border-color: var(--cb-cyan); box-shadow: 0 0 10px rgba(0, 240, 255, 0.3); }
 .cyber-tab-btn.active { background-color: var(--cb-yellow); color: #000; border-color: var(--cb-yellow); font-weight: bold; }
 
-/* Header Action Buttons */
+/* Cyberpunk 2077 Buttons (gwannon clip-path & glow) */
 .cyber-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.45rem 1rem;
+  padding: 0.5rem 1.15rem;
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: 0.825rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   border: 1px solid var(--cb-border-dim);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.cyber-btn-primary { background-color: rgba(0, 240, 255, 0.1); color: var(--cb-cyan); border-color: var(--cb-cyan); }
-.cyber-btn-primary:hover { background-color: var(--cb-cyan); color: #000; box-shadow: 0 0 12px rgba(0, 240, 255, 0.6); }
+.cyber-btn-primary { background-color: rgba(0, 240, 255, 0.12); color: var(--cb-cyan); border-color: var(--cb-cyan); }
+.cyber-btn-primary:hover { background-color: var(--cb-cyan); color: #000; box-shadow: 0 0 16px rgba(0, 240, 255, 0.7); }
+
 .cyber-btn-secondary { background-color: var(--cb-bg-elevated); color: var(--cb-text-main); border-color: var(--cb-border-dim); }
-.cyber-btn-secondary:hover { color: var(--cb-yellow); border-color: var(--cb-yellow); }
+.cyber-btn-secondary:hover { color: #000; background-color: var(--cb-yellow); border-color: var(--cb-yellow); box-shadow: 0 0 16px rgba(252, 238, 10, 0.7); }

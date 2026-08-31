@@ -16,14 +16,14 @@
   padding: 1.1rem;
 }
 
-/* Exclusive Metric Card Title - Muted Steel Slate (Does NOT collide with Neon Cyan Section Titles!) */
+/* Exclusive Metric Card Title - Standardized HYDRASTREAM Yellow */
 .metric-card-title {
-  font-family: var(--font-mono) !important;
-  font-size: 0.8rem !important;
+  font-family: var(--font-heading) !important;
+  font-size: 0.85rem !important;
   font-weight: 700 !important;
   letter-spacing: 0.05em !important;
   text-transform: uppercase !important;
-  color: var(--cb-card-title-color) !important; /* #94a3b8 Steel Slate */
+  color: var(--cb-card-title-color) !important; /* Standard Yellow */
   display: block !important;
   margin-bottom: 0.25rem !important;
 }
@@ -35,12 +35,22 @@
   font-weight: 800;
   line-height: 1.2;
   margin: 0.25rem 0;
+  color: var(--cb-text-main);
 }
 
+.metric-value.cyan { color: var(--cb-cyan); }
 .metric-value.emerald { color: #10b981; }
 .metric-value.amber { color: #fbbf24; }
 .metric-value.sky { color: #38bdf8; }
 .metric-value.magenta { color: #ec4899; }
+
+/* Standardized Metric Card Subtext / Footer Info */
+.metric-subtext {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--cb-text-muted);
+  display: block;
+}
 
 .status-badge {
   display: inline-block;

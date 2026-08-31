@@ -6,7 +6,7 @@ import { state } from '../state.js';
 
 export function switchView(viewName) {
   state.activeView = viewName;
-  
+
   document.querySelectorAll('.spa-view').forEach(el => {
     el.style.display = 'none';
   });
@@ -26,6 +26,7 @@ export function switchView(viewName) {
   }
 
   window.location.hash = viewName;
+  window.dispatchEvent(new CustomEvent('viewChanged', { detail: { viewName } }));
 }
 
 export function filterTab(type) {

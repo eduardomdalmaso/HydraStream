@@ -8,6 +8,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/streams", h.handleStreams)
 	mux.HandleFunc("/api/v1/streams/", h.handleStreamByID)
 	mux.HandleFunc("/api/v1/cluster/topology", h.handleClusterTopology)
+	mux.HandleFunc("/api/v1/telemetry/stats", h.handleControlPanelTelemetry)
 	mux.HandleFunc("/api/v1/info", h.handleSystemInfo)
 
 	// Swagger Interactive API Docs

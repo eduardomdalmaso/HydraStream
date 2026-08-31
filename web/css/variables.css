@@ -2,14 +2,14 @@
    CYBERPUNK DESIGN SYSTEM - TOKENS & VARIABLES
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@600;700;800&family=Orbitron:wght@700;800;900&family=Share+Tech+Mono&family=Teko:wght@600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Advent+Pro:wght@300;400;600;700&family=Barlow:wght@300;400;600;700&family=Oxanium:wght@300;400;600;700;800&family=Tomorrow:wght@300;400;600;700;800&display=swap');
 
 :root {
-  /* Fonts */
-  --font-display: 'Orbitron', sans-serif;
-  --font-heading: 'Teko', sans-serif;
-  --font-body: 'Barlow', sans-serif;
-  --font-mono: 'Share Tech Mono', monospace;
+  /* Recommended Cyberpunk Fonts */
+  --font-display: 'Oxanium', sans-serif;
+  --font-heading: 'Tomorrow', sans-serif;
+  --font-body: 'Barlow', 'Advent Pro', sans-serif;
+  --font-mono: 'Oxanium', monospace;
 
   /* Dark Theme Palette */
   --cb-bg-void: #07080c;
@@ -25,8 +25,8 @@
   --cb-amber: #ffaa00;
 
   /* Exclusive Typography Tokens */
-  --cb-title-color: #00f0ff;
-  --cb-card-title-color: #94a3b8;
+  --cb-title-color: #fcee0a;
+  --cb-card-title-color: #fcee0a;
   --cb-table-header-color: #f59e0b;
   --cb-text-main: #f0f2f5;
   --cb-text-muted: #8b94a7;
@@ -45,8 +45,8 @@
   --cb-magenta: #d9004c;
   --cb-green: #00a843;
   --cb-amber: #d97700;
-  --cb-title-color: #0088cc;
-  --cb-card-title-color: #475569;
+  --cb-title-color: #d4a000;
+  --cb-card-title-color: #d4a000;
   --cb-table-header-color: #d97700;
   --cb-text-main: #0e1017;
   --cb-text-muted: #5a6478;

@@ -16,33 +16,105 @@ const OpenAPI3Spec = `{
   "paths": {
     "/api/v1/streams": {
       "get": {
-        "summary": "List active streams",
-        "responses": {
-          "200": { "description": "OK" }
-        }
+        "summary": "List active video streams",
+        "parameters": [
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "tenant", "in": "query", "schema": { "type": "string" } },
+          { "name": "sort_by", "in": "query", "schema": { "type": "string" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } }
+        ],
+        "responses": { "200": { "description": "List of active streams" } }
       },
       "post": {
-        "summary": "Register a new RTSP stream",
-        "responses": {
-          "201": { "description": "Stream created" }
-        }
+        "summary": "Register a new RTSP/Video stream",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["stream_id", "source_url"],
+                "properties": {
+                  "tenant_id": { "type": "string" },
+                  "stream_id": { "type": "string" },
+                  "source_url": { "type": "string" },
+                  "decoding_engine": { "type": "string" },
+                  "ingest_fps": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Stream created and ingestion started" } }
+      }
+    },
+    "/api/v1/streams/{id}": {
+      "get": {
+        "summary": "Get stream details by ID",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Stream details" }, "404": { "description": "Not found" } }
+      },
+      "delete": {
+        "summary": "Stop ingestion and delete stream",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Stream deleted" }, "404": { "description": "Not found" } }
+      }
+    },
+    "/api/v1/streams/{id}/ingest": {
+      "get": {
+        "summary": "Get live RTSP/RTP ingestion telemetry stats",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Live ingestion stats" } }
+      }
+    },
+    "/api/v1/streams/{id}/consumers/{analytic_type}": {
+      "patch": {
+        "summary": "Update consumer sampling FPS or output format",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "analytic_type", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "target_fps": { "type": "number" },
+                  "output_format": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Consumer updated" } }
+      }
+    },
+    "/api/v1/telemetry/stats": {
+      "get": {
+        "summary": "Get real-time dashboard telemetry and charts history",
+        "responses": { "200": { "description": "Control panel telemetry" } }
       }
     },
     "/api/v1/info": {
       "get": {
-        "summary": "System Info & Hardware Readout",
-        "responses": {
-          "200": { "description": "OK" }
-        }
+        "summary": "System and GPU Hardware Readout",
+        "responses": { "200": { "description": "Hardware and engine info" } }
       }
     },
     "/api/v1/cluster/topology": {
       "get": {
-        "summary": "Cluster Zero-Copy Transport Topology",
-        "responses": {
-          "200": { "description": "OK" }
-        }
+        "summary": "Active Cluster Nodes and Transport Routing Topology",
+        "responses": { "200": { "description": "Cluster topology" } }
       }
+    },
+    "/healthz": {
+      "get": { "summary": "Liveness probe", "responses": { "200": { "description": "OK" } } }
+    },
+    "/metrics": {
+      "get": { "summary": "Prometheus Metrics", "responses": { "200": { "description": "Prometheus text format" } } }
     }
   }
 }`
@@ -57,9 +129,9 @@ func ServeSwaggerUI(w http.ResponseWriter, r *http.Request) {
   <title>HydraStream API Docs - Swagger UI</title>
   <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.18.3/swagger-ui.css" />
   <style>
-    html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
+    html { box-sizing: border-box; overflow-y: scroll; }
     *, *:before, *:after { box-sizing: inherit; }
-    body { margin: 0; background: #0b0e14; color: #fff; }
+    body { margin: 0; background: #07080c; color: #fff; }
     .swagger-ui .topbar { display: none; }
     .swagger-ui { filter: invert(88%%) hue-rotate(180deg); }
   </style>

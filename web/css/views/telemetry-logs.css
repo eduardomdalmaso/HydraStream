@@ -1,0 +1,63 @@
+/* ==========================================================================
+   VIEW: TELEMETRY LOGS
+   ========================================================================== */
+
+.logs-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.logs-terminal-box {
+  background: #06070a;
+  border: 1px solid var(--cb-border-dim);
+  border-left: 3px solid var(--cb-cyan);
+  padding: 1rem;
+  height: 520px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 0.785rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.log-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.log-time {
+  color: var(--cb-text-muted);
+  font-size: 0.725rem;
+  min-width: 90px;
+}
+
+.log-badge {
+  padding: 0.1rem 0.35rem;
+  font-size: 0.675rem;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.log-badge.info { background: rgba(0, 240, 255, 0.2); color: var(--cb-cyan); }
+.log-badge.warn { background: rgba(252, 238, 10, 0.2); color: var(--cb-yellow); }
+.log-badge.crit { background: rgba(255, 0, 85, 0.2); color: var(--cb-magenta); }
+.log-badge.ok { background: rgba(0, 255, 102, 0.2); color: var(--cb-green); }
+
+.log-subsys {
+  color: #a78bfa;
+  font-weight: 600;
+  min-width: 75px;
+}
+
+.log-msg {
+  color: #cbd5e1;
+  flex: 1;
+}

@@ -29,7 +29,7 @@ func NewStreamRepository() *StreamRepository {
 	st := &domain.Stream{
 		TenantID:       "tenant_company_alpha",
 		StreamID:       "cam_entrance_01",
-		SourceURL:      "rtsp://mediamtx:8554/tenant_company_alpha/cam_entrance_01",
+		SourceURL:      "synthetic://benchmark_4k_gpu",
 		DecodingEngine: "nvidia_nvdec",
 		Status:         "online",
 		Resolution:     "1920x1080",
