@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 
 	"hydrastream/internal/adapters/secondary/gpu"
@@ -248,6 +249,15 @@ func (s *StreamService) GetControlPanelTelemetry(ctx context.Context) (*domain.C
 		hostname = "localhost"
 	}
 
+	shmOccupancy := 0.1
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs("/dev/shm", &stat); err == nil && stat.Blocks > 0 {
+		totalBytes := stat.Blocks * uint64(stat.Bsize)
+		freeBytes := stat.Bfree * uint64(stat.Bsize)
+		usedBytes := totalBytes - freeBytes
+		shmOccupancy = math.Round((float64(usedBytes)/float64(totalBytes))*1000) / 10.0
+	}
+
 	telemetry := &domain.ControlPanelTelemetry{
 		HealthScore:        healthScore,
 		SLAStatus:          slaStatus,
@@ -255,7 +265,7 @@ func (s *StreamService) GetControlPanelTelemetry(ctx context.Context) (*domain.C
 		NodesSummary:       fmt.Sprintf("%s | %d Cores", hostname, runtime.NumCPU()),
 		AvgDecodeLatencyMs: avgLatency,
 		DecoderEngineName:  "NVDEC / POSIX SHM (/dev/shm)",
-		POSIXShmOccupancy:  18.4,
+		POSIXShmOccupancy:  shmOccupancy,
 		ShmLockFreeStatus:  "ATOMIC LOCK-FREE",
 		PeakBandwidthMbps:  bandwidthMbps,
 		BandwidthHistory:   bwHist,
