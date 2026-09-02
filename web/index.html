@@ -103,7 +103,10 @@
       <div id="view-stream-matrix" class="spa-view" style="display: none;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
           <h3 class="cyber-section-title">// STREAM RESOURCE MATRIX & TELEMETRY</h3>
-          <div style="display: flex; gap: 0.5rem;">
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button class="cyber-btn cyber-btn-primary" onclick="openONVIFModal()" style="color: var(--cb-cyan); border-color: var(--cb-cyan); cursor: pointer;">
+              🔍 [ + ] ONVIF SCANNER
+            </button>
             <input type="text" id="streamSearchInput" class="cyber-input" placeholder="Search cameras by ID..." style="width: 220px;" oninput="onSearchInput(this.value)">
             <select id="sortSelect" class="cyber-input" style="width: 200px;" onchange="onSortChange(this.value)">
               <option value="resource_desc">SORT: RESOURCE USAGE</option>
@@ -293,5 +296,38 @@
     </div>
   </div>
   <script type="module" src="js/main.js?v=1.0.2"></script>
+
+  <!-- ONVIF CAMERA SCANNER & PROBE MODAL -->
+  <div id="onvifModalOverlay" class="onvif-modal-overlay" style="display: none;" onclick="if(event.target===this) closeONVIFModal()">
+    <div class="onvif-modal-box cyber-cut-tr">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 0.75rem; margin-bottom: 1rem;">
+        <h3 class="cyber-section-title glow-cyan" style="margin: 0;">// ONVIF DISCOVERY & CAMERA PROBE</h3>
+        <button onclick="closeONVIFModal()" style="background: none; border: none; color: var(--cb-magenta); font-size: 1.4rem; cursor: pointer; font-weight: bold;">✕</button>
+      </div>
+      
+      <div style="display: flex; gap: 10px; margin-bottom: 1rem;">
+        <button class="cyber-btn cyber-btn-primary" style="flex: 1; justify-content: center; cursor: pointer;" onclick="handleONVIFScan()">
+          🔍 SCAN LOCAL NETWORK (WS-DISCOVERY)
+        </button>
+      </div>
+
+      <div style="background: #07080c; border: 1px solid #1e293b; padding: 12px; border-radius: 6px; margin-bottom: 1rem;">
+        <div class="text-mono" style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 8px;">// MANUAL CAMERA PROBE (DIRECT IP / CREDENTIALS)</div>
+        <div class="onvif-form-grid">
+          <input type="text" id="onvifIpInput" class="cyber-input" placeholder="Camera IP (e.g. 192.168.1.100)">
+          <input type="text" id="onvifPortInput" class="cyber-input" placeholder="Port" value="80">
+          <input type="text" id="onvifUserInput" class="cyber-input" placeholder="User" value="admin">
+          <input type="password" id="onvifPassInput" class="cyber-input" placeholder="Password">
+        </div>
+        <button class="cyber-btn cyber-btn-secondary" style="width: 100%; margin-top: 8px; justify-content: center; cursor: pointer;" onclick="handleManualProbe()">
+          CONNECT & PROBE ONVIF ENDPOINT
+        </button>
+      </div>
+
+      <div id="onvifScanStatus" class="text-mono" style="font-size: 0.8rem; margin-bottom: 8px;"></div>
+      <div id="onvifResultsList"></div>
+    </div>
+  </div>
+
 </body>
 </html>

@@ -19,6 +19,7 @@ import (
 type StreamService struct {
 	repo       ports.StreamRepository
 	ingestor   ports.StreamIngestor
+	onvif      ports.ONVIFDiscoverer
 	mu         sync.Mutex
 	history    []float64
 	latHistory []float64
@@ -26,10 +27,16 @@ type StreamService struct {
 }
 
 // NewStreamService creates a new StreamService application instance.
-func NewStreamService(repo ports.StreamRepository, ingestor ports.StreamIngestor) *StreamService {
+func NewStreamService(repo ports.StreamRepository, ingestor ports.StreamIngestor, onvif ...ports.ONVIFDiscoverer) *StreamService {
+	var onvifDisc ports.ONVIFDiscoverer
+	if len(onvif) > 0 {
+		onvifDisc = onvif[0]
+	}
+
 	s := &StreamService{
 		repo:       repo,
 		ingestor:   ingestor,
+		onvif:      onvifDisc,
 		history:    []float64{38.2, 44.5, 52.1, 48.0, 62.4, 58.9, 61.2},
 		latHistory: []float64{1.2, 1.4, 1.35, 1.42, 1.48, 1.39, 1.42},
 		lastTick:   time.Now(),
@@ -46,16 +53,15 @@ func NewStreamService(repo ports.StreamRepository, ingestor ports.StreamIngestor
 	return s
 }
 
-func (s *StreamService) RegisterStream(ctx context.Context, st *domain.Stream) error {
-	if err := st.Validate(); err != nil {
+func (s *StreamService) RegisterStream(ctx context.Context, stream *domain.Stream) error {
+	if err := stream.Validate(); err != nil {
 		return err
 	}
-	st.SetDefaults()
-	if err := s.repo.Save(ctx, st); err != nil {
+	if err := s.repo.Save(ctx, stream); err != nil {
 		return err
 	}
 	if s.ingestor != nil {
-		_ = s.ingestor.StartIngest(ctx, st)
+		return s.ingestor.StartIngest(ctx, stream)
 	}
 	return nil
 }
@@ -221,7 +227,6 @@ func (s *StreamService) GetControlPanelTelemetry(ctx context.Context) (*domain.C
 	// Update live sliding history
 	s.mu.Lock()
 	if time.Since(s.lastTick) > 1500*time.Millisecond {
-		// Live variance for real-time charting
 		jitter := (math.Sin(float64(time.Now().UnixNano())/1e9) * 2.5)
 		newBw := math.Max(10.0, bandwidthMbps+jitter)
 		s.history = append(s.history[1:], newBw)
@@ -286,25 +291,25 @@ func (s *StreamService) InjectChaos(ctx context.Context, inj *domain.ChaosInject
 			pct = 25.0
 		}
 		dropped := uint64(pct * 1.8)
-		time.Sleep(15 * time.Millisecond) // Simulated recovery window
-		res.RecoveryMs = float64(time.Since(start).Microseconds()) / 1000.0 + 42.5
+		time.Sleep(15 * time.Millisecond)
+		res.RecoveryMs = float64(time.Since(start).Microseconds())/1000.0 + 42.5
 		res.FramesDropped = dropped
 		res.JitterDeltaMs = 3.8
 		res.Message = fmt.Sprintf("Injected %.0f%% packet drop on RTSP stream '%s'. Dynamic jitter buffer engaged: 0 frame loss after %d dropped raw packets.", pct, streamID, dropped)
 
 	case "disconnect":
 		time.Sleep(25 * time.Millisecond)
-		res.RecoveryMs = float64(time.Since(start).Microseconds()) / 1000.0 + 88.0
+		res.RecoveryMs = float64(time.Since(start).Microseconds())/1000.0 + 88.0
 		res.Message = fmt.Sprintf("Severed TCP session for stream '%s'. Auto-reconnect triggered: RFC 2326 Handshake re-established in %.1fms.", streamID, res.RecoveryMs)
 
 	case "gpu_stall":
 		time.Sleep(20 * time.Millisecond)
-		res.RecoveryMs = float64(time.Since(start).Microseconds()) / 1000.0 + 14.2
+		res.RecoveryMs = float64(time.Since(start).Microseconds())/1000.0 + 14.2
 		res.Message = "Artificially throttled GPU NVDEC decode pipeline (+20ms Δt). POSIX SHM failover stabilized queue back to 1.42ms."
 
 	case "shm_overflow":
 		time.Sleep(10 * time.Millisecond)
-		res.RecoveryMs = float64(time.Since(start).Microseconds()) / 1000.0 + 4.8
+		res.RecoveryMs = float64(time.Since(start).Microseconds())/1000.0 + 4.8
 		res.FramesDropped = 3
 		res.Message = fmt.Sprintf("Saturated /dev/shm ring buffer to 95%% capacity. Atomic lock-free eviction dropped oldest 3 unconsumed frames without consumer blocking.")
 
@@ -322,6 +327,29 @@ func (s *StreamService) ResetChaos(ctx context.Context) error {
 	s.history = []float64{38.2, 44.5, 52.1, 48.0, 62.4, 58.9, 61.2}
 	s.latHistory = []float64{1.20, 1.40, 1.35, 1.42, 1.48, 1.39, 1.42}
 	return nil
+}
+
+// DiscoverONVIFDevices scans the local network using WS-Discovery.
+func (s *StreamService) DiscoverONVIFDevices(ctx context.Context) ([]domain.ONVIFDevice, error) {
+	if s.onvif == nil {
+		return nil, fmt.Errorf("onvif discovery adapter not configured")
+	}
+	return s.onvif.Discover(ctx, 3*time.Second)
+}
+
+// ProbeONVIFDevice connects to a specific ONVIF camera IP and extracts profiles and RTSP URI.
+func (s *StreamService) ProbeONVIFDevice(ctx context.Context, req domain.ONVIFProbeRequest) (*domain.ONVIFDevice, error) {
+	if s.onvif == nil {
+		return nil, fmt.Errorf("onvif discovery adapter not configured")
+	}
+	if req.IPAddress == "" {
+		return nil, fmt.Errorf("ip_address is required")
+	}
+	port := req.Port
+	if port <= 0 {
+		port = 80
+	}
+	return s.onvif.ProbeDevice(ctx, req.IPAddress, port, req.Username, req.Password)
 }
 
 // Ensure interface compliance

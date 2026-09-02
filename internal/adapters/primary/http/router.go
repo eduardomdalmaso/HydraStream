@@ -13,6 +13,12 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/chaos/inject", h.handleChaosInject)
 	mux.HandleFunc("/api/v1/chaos/reset", h.handleChaosReset)
 
+	// ONVIF Camera Discovery & RTSP Stream Extraction
+	onvifH := NewONVIFHandler(h.useCase)
+	mux.HandleFunc("/api/v1/onvif/discover", onvifH.HandleDiscover)
+	mux.HandleFunc("/api/v1/onvif/probe", onvifH.HandleProbe)
+	mux.HandleFunc("/api/v1/onvif/import", onvifH.HandleImport)
+
 	// Swagger Interactive API Docs
 	mux.HandleFunc("/swagger/", ServeSwaggerUI)
 	mux.HandleFunc("/swagger/doc.json", func(w http.ResponseWriter, r *http.Request) {

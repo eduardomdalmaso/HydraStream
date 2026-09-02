@@ -8,6 +8,7 @@ import (
 	"hydrastream/internal/adapters/secondary/gpu"
 	"hydrastream/internal/adapters/secondary/ingest"
 	"hydrastream/internal/adapters/secondary/memory"
+	"hydrastream/internal/adapters/secondary/onvif"
 	"hydrastream/internal/application"
 )
 
@@ -17,12 +18,13 @@ func main() {
 	// Detect underlying GPU Hardware
 	hw := gpu.DetectHardware()
 
-	// 1. Driven Adapters (Secondary - Storage & RTSP Ingestor)
+	// 1. Driven Adapters (Secondary - Storage, RTSP Ingestor & ONVIF Scanner)
 	streamRepo := memory.NewStreamRepository()
 	rtspIngestor := ingest.NewRTSPIngestor()
+	onvifAdapter := onvif.NewONVIFAdapter()
 
 	// 2. Application Layer (Service / Use Case)
-	streamService := application.NewStreamService(streamRepo, rtspIngestor)
+	streamService := application.NewStreamService(streamRepo, rtspIngestor, onvifAdapter)
 
 	// 3. Driving Adapter (Primary - HTTP REST API)
 	apiHandler := httpAdapter.NewHandler(streamService)

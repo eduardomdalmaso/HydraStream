@@ -19,4 +19,8 @@ type StreamUseCase interface {
 	GetIngestStats(ctx context.Context, streamID string) (*domain.IngestStats, error)
 	InjectChaos(ctx context.Context, injection *domain.ChaosInjection) (*domain.ChaosResult, error)
 	ResetChaos(ctx context.Context) error
+
+	// ONVIF discovery and probing
+	DiscoverONVIFDevices(ctx context.Context) ([]domain.ONVIFDevice, error)
+	ProbeONVIFDevice(ctx context.Context, req domain.ONVIFProbeRequest) (*domain.ONVIFDevice, error)
 }
