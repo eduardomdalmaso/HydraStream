@@ -2,12 +2,18 @@ pub mod shm;
 pub mod governor;
 pub mod pipeline;
 pub mod transport;
+pub mod sync;
 pub mod ffi;
 
 pub use shm::{ShmWriter, ShmReader, ShmHeader, SlotHeader};
 pub use governor::FpsGovernor;
 pub use pipeline::StreamPipeline;
-pub use transport::{BroadcastHub, FramePayload, FrameStorage, CacheAlignedAtomicU64, CacheAlignedAtomicU32};
+pub use transport::{
+    BroadcastHub, FramePayload, FrameStorage, LockFreePeerList, RcuConfig,
+    CacheAlignedAtomicU64, CacheAlignedAtomicU32,
+    BIT_WEBSOCKET, BIT_WEBRTC, BIT_ANALYTICS, BIT_ALL,
+};
+pub use sync::{AtomicSemaphore, HybridMutex, ParkingTable};
 
 #[cfg(test)]
 mod tests {
@@ -98,58 +104,204 @@ mod tests {
     }
 
     #[test]
-    fn test_broadcast_hub_multi_consumer_concurrency() {
-        let hub = Arc::new(BroadcastHub::new(16));
-        let num_consumers = 4;
-        let frames_to_publish = 50;
+    fn test_lock_free_peer_list() {
+        let list = LockFreePeerList::new();
+        assert_eq!(list.active_count(), 0);
 
-        let mut handles = Vec::new();
+        list.register(101, BIT_WEBSOCKET);
+        list.register(102, BIT_WEBRTC);
+        list.register(103, BIT_ANALYTICS);
+        assert_eq!(list.active_count(), 3);
 
-        for _ in 0..num_consumers {
-            let hub_clone = Arc::clone(&hub);
-            let handle = thread::spawn(move || {
-                let mut last_seq = 0;
-                let mut count = 0;
-                while count < frames_to_publish {
-                    if let Some(frame) = hub_clone.wait_and_read(last_seq) {
-                        assert!(frame.frame_id > last_seq);
-                        last_seq = frame.frame_id;
-                        count += 1;
-                    } else {
-                        break;
-                    }
-                }
-                count
-            });
-            handles.push(handle);
+        list.mark_inactive(102);
+        assert_eq!(list.active_count(), 2);
+
+        let mut collected = Vec::new();
+        list.for_each(|peer| {
+            collected.push(peer.client_id);
+        });
+        assert!(collected.contains(&101));
+        assert!(collected.contains(&103));
+        assert!(!collected.contains(&102));
+    }
+
+    #[test]
+    fn test_rcu_config_hot_swap() {
+        #[derive(Debug, PartialEq, Eq)]
+        struct CamConfig {
+            width: u32,
+            fps: u32,
         }
 
-        // Producer thread
-        for i in 1..=frames_to_publish {
+        let rcu = RcuConfig::new(CamConfig { width: 1920, fps: 30 });
+        assert_eq!(rcu.load().width, 1920);
+        assert_eq!(rcu.load().fps, 30);
+
+        // Update dynamically
+        rcu.update(CamConfig { width: 3840, fps: 60 });
+        assert_eq!(rcu.load().width, 3840);
+        assert_eq!(rcu.load().fps, 60);
+    }
+
+    #[test]
+    fn test_broadcast_hub_selective_bitset_concurrency() {
+        let hub = Arc::new(BroadcastHub::new(16));
+        
+        // Consumer 1: Only interested in BIT_WEBSOCKET
+        let hub_ws = Arc::clone(&hub);
+        let handle_ws = thread::spawn(move || {
+            let mut received = Vec::new();
+            for _ in 0..5 {
+                if let Some(frame) = hub_ws.wait_and_read(
+                    received.last().copied().unwrap_or(0),
+                    BIT_WEBSOCKET,
+                    Some(Duration::from_secs(2)),
+                ) {
+                    received.push(frame.frame_id);
+                }
+            }
+            received
+        });
+
+        // Consumer 2: Only interested in BIT_WEBRTC
+        let hub_webrtc = Arc::clone(&hub);
+        let handle_webrtc = thread::spawn(move || {
+            let mut received = Vec::new();
+            for _ in 0..5 {
+                if let Some(frame) = hub_webrtc.wait_and_read(
+                    received.last().copied().unwrap_or(0),
+                    BIT_WEBRTC,
+                    Some(Duration::from_secs(2)),
+                ) {
+                    received.push(frame.frame_id);
+                }
+            }
+            received
+        });
+
+        thread::sleep(Duration::from_millis(50));
+
+        // Publish alternating frames
+        for i in 1..=10 {
+            let mask = if i % 2 == 0 { BIT_WEBSOCKET } else { BIT_WEBRTC };
             let payload = FramePayload::new_host(
                 i as u64,
                 (i * 33_333) as u64,
                 640,
                 480,
                 1,
+                mask,
                 vec![i as u8; 640 * 480 * 3],
             );
             hub.publish(payload);
-            thread::sleep(Duration::from_millis(1));
+            thread::sleep(Duration::from_millis(5));
         }
 
-        for handle in handles {
-            let frames_received = handle.join().expect("Consumer panicked");
-            assert_eq!(frames_received, frames_to_publish);
+        let ws_frames = handle_ws.join().expect("WS consumer panicked");
+        let webrtc_frames = handle_webrtc.join().expect("WebRTC consumer panicked");
+
+        assert_eq!(ws_frames.len(), 5);
+        assert_eq!(webrtc_frames.len(), 5);
+        
+        assert_eq!(ws_frames, vec![2, 4, 6, 8, 10]);
+        assert_eq!(webrtc_frames, vec![1, 3, 5, 7, 9]);
+    }
+
+    #[test]
+    fn test_atomic_semaphore_backpressure() {
+        let sem = Arc::new(AtomicSemaphore::new(2)); // Buffer capacity = 2 permits
+        assert_eq!(sem.available(), 2);
+
+        assert!(sem.acquire(Some(Duration::from_millis(10))));
+        assert!(sem.acquire(Some(Duration::from_millis(10))));
+        assert_eq!(sem.available(), 0);
+
+        // Third acquire should timeout because permits = 0
+        assert!(!sem.acquire(Some(Duration::from_millis(20))));
+
+        // Release 1 permit from another thread
+        let sem_clone = Arc::clone(&sem);
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(30));
+            sem_clone.release();
+        });
+
+        // Now acquire succeeds
+        assert!(sem.acquire(Some(Duration::from_secs(1))));
+    }
+
+    #[test]
+    fn test_hybrid_mutex_concurrency() {
+        let count = Arc::new(HybridMutex::new(0u64));
+        let threads: Vec<_> = (0..8)
+            .map(|_| {
+                let c = Arc::clone(&count);
+                thread::spawn(move || {
+                    for _ in 0..1_000 {
+                        let mut guard = c.lock();
+                        *guard += 1;
+                    }
+                })
+            })
+            .collect();
+
+        for t in threads {
+            t.join().expect("Thread panicked");
         }
 
-        let (published, _dropped, _active) = hub.stats();
-        assert_eq!(published, frames_to_publish as u64);
+        assert_eq!(*count.lock(), 8_000);
+    }
+
+    #[test]
+    fn test_parking_table_park_unpark() {
+        let table = Arc::new(ParkingTable::new());
+        let test_addr = 0x12345678usize;
+
+        let table_clone = Arc::clone(&table);
+        let handle = thread::spawn(move || {
+            // Park on address
+            table_clone.park(test_addr, Some(Duration::from_secs(2)))
+        });
+
+        thread::sleep(Duration::from_millis(50));
+        let unparked = table.unpark_all(test_addr);
+        assert_eq!(unparked, 1);
+
+        assert!(handle.join().expect("Park thread panicked"));
+    }
+
+    #[test]
+    fn test_scoped_threads_zero_arc_dispatch() {
+        // Scoped distribution without any Arc cloning (0 atomic overhead)
+        let frame = FramePayload::new_host(
+            42,
+            1_000_000,
+            1920,
+            1080,
+            1,
+            BIT_ALL,
+            vec![7u8; 100],
+        );
+
+        let mut results = vec![0u8; 4];
+
+        // Mara Bos Chapter 1: thread::scope guarantees threads don't outlive the scope
+        thread::scope(|s| {
+            for (idx, slot) in results.iter_mut().enumerate() {
+                let frame_ref = &frame; // Pure borrowed reference, no Arc!
+                s.spawn(move || {
+                    assert_eq!(frame_ref.frame_id, 42);
+                    *slot = (idx as u8) + 1;
+                });
+            }
+        });
+
+        assert_eq!(results, vec![1, 2, 3, 4]);
     }
 
     #[test]
     fn test_fps_governor_sampling() {
-        let mut gov = FpsGovernor::new(2.0); // 2 FPS => 500,000 us interval
+        let mut gov = FpsGovernor::new(2.0);
 
         assert!(gov.should_dispatch(0));
         assert!(!gov.should_dispatch(100_000));
