@@ -14,7 +14,7 @@ const (
 	HydraVersion uint32 = 1
 )
 
-// Header represents the binary layout of the Rust ShmHeader.
+// Header represents the binary layout of the Rust ShmHeader (64-byte cache-aligned).
 type Header struct {
 	Magic         uint32
 	Version       uint32
@@ -23,7 +23,9 @@ type Header struct {
 	Format        uint32
 	SlotCount     uint32
 	SlotSize      uint32
+	NotifySeq     uint32
 	WriteSequence uint64
+	Reserved      [24]byte
 }
 
 // Manager inspects and interacts with POSIX shared memory ring buffers.

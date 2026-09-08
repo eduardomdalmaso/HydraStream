@@ -1,17 +1,68 @@
 //! POSIX Shared Memory (/dev/shm) Zero-Copy Ring Buffer
-//! Lock-free circular slot architecture with atomic sequence pointers.
+//! Lock-free circular slot architecture with atomic sequence pointers,
+//! cache-line alignment (64-byte boundary), and OS Futex synchronization.
 
 use std::fs::{File, OpenOptions};
 use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::time::Duration;
 use memmap2::{MmapMut, MmapOptions};
 
 pub const HYDRA_MAGIC: u32 = 0x48594452; // "HYDR"
 pub const HYDRA_VERSION: u32 = 1;
 pub const DEFAULT_SLOTS: usize = 16;
 
-#[repr(C)]
+/// Process-shared Futex primitives for Linux memory-mapped files
+#[cfg(target_os = "linux")]
+pub(crate) unsafe fn futex_wait_shared(uaddr: *const AtomicU32, val: u32, timeout: Option<Duration>) -> bool {
+    let ts = timeout.map(|d| libc::timespec {
+        tv_sec: d.as_secs() as libc::time_t,
+        tv_nsec: d.subsec_nanos() as libc::c_long,
+    });
+    let ts_ptr = ts.as_ref().map_or(std::ptr::null(), |t| t as *const libc::timespec);
+
+    let ret = libc::syscall(
+        libc::SYS_futex,
+        uaddr as *const u32,
+        libc::FUTEX_WAIT, // 0 = Process-Shared FUTEX_WAIT
+        val,
+        ts_ptr,
+        std::ptr::null::<u32>(),
+        0u32,
+    );
+    ret == 0
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) unsafe fn futex_wake_shared(uaddr: *const AtomicU32, count: i32) -> i32 {
+    let ret = libc::syscall(
+        libc::SYS_futex,
+        uaddr as *const u32,
+        libc::FUTEX_WAKE, // 1 = Process-Shared FUTEX_WAKE
+        count,
+        std::ptr::null::<libc::timespec>(),
+        std::ptr::null::<u32>(),
+        0u32,
+    );
+    ret as i32
+}
+
+#[cfg(not(target_os = "linux"))]
+pub(crate) unsafe fn futex_wait_shared(uaddr: *const AtomicU32, val: u32, _timeout: Option<Duration>) -> bool {
+    atomic_wait::wait(&*uaddr, val);
+    true
+}
+
+#[cfg(not(target_os = "linux"))]
+pub(crate) unsafe fn futex_wake_shared(uaddr: *const AtomicU32, _count: i32) -> i32 {
+    atomic_wait::wake_all(&*uaddr);
+    1
+}
+
+/// Cache-line aligned SHM Global Header (64 bytes).
+/// Isolates write_sequence and notify_seq to prevent False Sharing.
+#[repr(C, align(64))]
 #[derive(Debug, Clone, Copy)]
 pub struct ShmHeader {
     pub magic: u32,
@@ -21,10 +72,14 @@ pub struct ShmHeader {
     pub format: u32, // 1: RGB24, 2: BGR24, 3: NV12, 4: RGBA32
     pub slot_count: u32,
     pub slot_size: u32,
-    pub write_sequence: u64,
+    pub notify_seq: u32,     // 32-bit Futex notification word
+    pub write_sequence: u64, // 64-bit Monotonic sequence with Release/Acquire ordering
+    pub _reserved: [u8; 24], // Padding to strictly match 64-byte cache line
 }
 
-#[repr(C)]
+/// Cache-line aligned Slot Header (64 bytes).
+/// Guarantees that each slot descriptor starts at a 64-byte boundary.
+#[repr(C, align(64))]
 #[derive(Debug, Clone, Copy)]
 pub struct SlotHeader {
     pub sequence: u64,
@@ -32,6 +87,7 @@ pub struct SlotHeader {
     pub frame_index: u64,
     pub payload_size: u32,
     pub flags: u32,
+    pub _reserved: [u8; 32], // Padding to fill 64 bytes
 }
 
 #[allow(dead_code)]
@@ -78,7 +134,7 @@ impl ShmWriter {
 
         let mut mmap = unsafe { MmapOptions::new().map_mut(&file)? };
 
-        // Initialize Header
+        // Initialize Header (aligned to 64 bytes)
         let header = ShmHeader {
             magic: HYDRA_MAGIC,
             version: HYDRA_VERSION,
@@ -87,7 +143,9 @@ impl ShmWriter {
             format,
             slot_count: slot_count as u32,
             slot_size: slot_size as u32,
+            notify_seq: 0,
             write_sequence: 0,
+            _reserved: [0u8; 24],
         };
 
         unsafe {
@@ -130,6 +188,7 @@ impl ShmWriter {
             frame_index: seq,
             payload_size: data.len() as u32,
             flags: 0,
+            _reserved: [0u8; 32],
         };
 
         unsafe {
@@ -141,8 +200,15 @@ impl ShmWriter {
             std::ptr::copy_nonoverlapping(data.as_ptr(), data_ptr, data.len());
 
             let global_hdr_ptr = base_ptr as *mut ShmHeader;
+            
+            // Release ordering: Ensures payload data and slot header are committed before write_sequence is updated
             let write_seq_atomic = &*(&((*global_hdr_ptr).write_sequence) as *const u64 as *const AtomicU64);
             write_seq_atomic.store(seq, Ordering::Release);
+
+            // Futex notification: Increment notify_seq and wake sleeping reader processes/threads
+            let notify_seq_atomic = &*(&((*global_hdr_ptr).notify_seq) as *const u32 as *const AtomicU32);
+            notify_seq_atomic.fetch_add(1, Ordering::Release);
+            futex_wake_shared(notify_seq_atomic, i32::MAX);
         }
 
         Ok(seq)
@@ -204,6 +270,7 @@ impl ShmReader {
         &self.header
     }
 
+    /// Non-blocking read of the latest frame.
     pub fn read_latest_frame(&mut self, out_buffer: &mut Vec<u8>) -> io::Result<Option<SlotHeader>> {
         let global_hdr_ptr = self.mmap.as_ptr() as *const ShmHeader;
         let current_seq = unsafe {
@@ -238,5 +305,38 @@ impl ShmReader {
         self.last_seen_seq = current_seq;
 
         Ok(Some(slot_header))
+    }
+
+    /// Blocking read using OS Futex (0% CPU while waiting for next frame).
+    pub fn wait_and_read_frame(&mut self, out_buffer: &mut Vec<u8>, timeout: Option<Duration>) -> io::Result<Option<SlotHeader>> {
+        let global_hdr_ptr = self.mmap.as_ptr() as *const ShmHeader;
+        let write_seq_atomic = unsafe {
+            &*(&((*global_hdr_ptr).write_sequence) as *const u64 as *const AtomicU64)
+        };
+        let notify_seq_atomic = unsafe {
+            &*(&((*global_hdr_ptr).notify_seq) as *const u32 as *const AtomicU32)
+        };
+
+        let start = std::time::Instant::now();
+        loop {
+            let current_seq = write_seq_atomic.load(Ordering::Acquire);
+            if current_seq > self.last_seen_seq {
+                if let Some(hdr) = self.read_latest_frame(out_buffer)? {
+                    return Ok(Some(hdr));
+                }
+            }
+
+            if let Some(t) = timeout {
+                if start.elapsed() >= t {
+                    return Ok(None);
+                }
+            }
+
+            // Sleep in OS kernel via process-shared Futex
+            let current_notify = notify_seq_atomic.load(Ordering::Acquire);
+            unsafe {
+                futex_wait_shared(notify_seq_atomic, current_notify, timeout);
+            }
+        }
     }
 }
