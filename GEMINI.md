@@ -36,32 +36,38 @@ hydrastream / hydraforge
 
 ---
 
-## 2. Design System & Estilo Visual (Cyberpunk High-Tech)
+## 2. Design System & Estilo Visual (Clean Slate Dark / High-Tech HUD)
 
-O frontend adota uma estética visual futurista de alta densidade inspirada no universo Cyberpunk 2077:
+O frontend adota o design system oficial Clean Slate Dark (espelhado do **HydraVMS**):
 
 ### Tokens e Cores Primárias:
-- **Fundo Profundo:** `#07080c` (Main Background), `#0b0e14` (Surface), `#121824` (Elevated Cards).
-- **Cores de Destaque Neon:**
-  - Ciano: `#00f0ff` (Primary Glow & Destaques)
-  - Amarelo Cyber: `#fcee0a` (Avisos & Títulos Secundários)
-  - Magenta: `#ff003c` (Erros, Alertas Críticos & Quedas)
-  - Verde Esmeralda: `#00ff9d` (Status Online, Sucesso & SLA)
-- **Tipografia Modular:** Google Fonts (`Advent Pro`, `Barlow`, `Tomorrow`, `Oxanium` e `JetBrains Mono`).
+- **Fundo Principal & Superfícies:** `#07080c` (Main Background), `#0e1117` (Surface), `#14171d` (Elevated Cards).
+- **Cores de Ação e Destaque:**
+  - Primário / Ações: `#ff5e3a` (Laranja HUD / Ações Primárias)
+  - Bordas Sutis: `rgba(255, 255, 255, 0.06)`
+  - Textos Principais: `#ffffff` (Títulos & Dados), `#8b94a0` (Muted / Labels)
+- **Status LEDs Universais (Neon Dots sem texto ao lado):**
+  - Online / Ingestão Ativa: `#00ff9d` (Verde neon com glow)
+  - Fan-Out / Gravação: `#00f0ff` (Azul neon pulsante)
+  - Alerta / Buffer Alto: `#fcee0a` (Amarelo cyber neon)
+  - Queda / Erro: `#ff003c` (Vermelho magenta neon)
+- **Tipografia Modular:** Google Fonts (`Roboto` / `Inter` para interface e `JetBrains Mono` para métricas, IDs, offsets e FPS).
 
-### ⚠️ Regras Estritas de Frontend & Cyberpunk Design System:
+### ⚠️ Regras Estritas de Frontend & UI Standards:
 - **Limite Máximo de 100 Linhas por Arquivo:** Nenhum arquivo CSS, JS ou JSX em `web/` pode ultrapassar **100 linhas**. Se crescer, deve ser modularizado.
-- **Proibição Absoluta de Emojis em Listas e Dropdowns:** Nunca usar emojis (como ⚡, 🎥, 📁, ⭐, 🏆, etc.) dentro de `<select>`, `<option>`, dropdowns, tabelas ou listas em nenhum projeto.
-- **Linguagem Técnica Militar Cyberpunk:** Listas e opções devem usar terminologia técnica HUD (ex: `[TRAINED] YOLO26M // mAP 58.1%`, `[STREAM] CAM_01 // 1080P @ 30 FPS`, `[OK]`, `// RETICLE`). Ícones visuais devem remeter puramente à estética Cyberpunk HUD e nunca serem embutidos dentro de itens de listagem.
+- **Proibição Absoluta de Emojis em Listas e Dropdowns:** Nunca usar emojis dentro de `<select>`, `<option>`, dropdowns, tabelas ou listas em nenhum projeto.
+- **Nomenclatura Concisa & HUD:** Rótulos atômicos (`INGESTAO`, `CONSUMIDORES`, `CODEC`, `RESOLUCAO`, `FPS`, `BITRATE`, `SHM BUFFER`).
+- **Botões de Confirmação:** O texto do botão de confirmação e salvamento é estritamente **`SALVAR`**.
 
 ---
 
 ## 3. Catálogo de Skills & Ecossistema Ultralytics
 
-O projeto possui integração direta com as skills oficiais de IA localizadas em `.agents/skills/`:
+O projeto possui integração direta com as skills oficiais de IA e UI localizadas em `.agents/skills/`:
 
 | Skill | Finalidade |
 | :--- | :--- |
+| **`stream-ui`** | Design system Clean Slate Dark, tokens, tipografia (`Roboto`/`JetBrains Mono`), layout e componentes modulares (< 100 linhas). |
 | **`validate-project`** | Executa auditoria de conformidade DDD, contagem de linhas web e testes unitários. |
 | **`yolo`** | Router principal de comandos e CLI Ultralytics. |
 | **`yolo-models`** | Guia de arquiteturas: YOLOv8, YOLO11, YOLO26 (Nano a XLarge) e variantes (`detect`, `segment`, `pose`, `obb`). |

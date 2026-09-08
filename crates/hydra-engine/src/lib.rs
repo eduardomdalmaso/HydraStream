@@ -17,7 +17,10 @@ pub use transport::{
 };
 pub use sync::{AtomicSemaphore, HybridMutex, ParkingTable};
 pub use codec::{NalParser, NalType, GopTracker, FLAG_KEYFRAME, FLAG_SPS_PPS, FLAG_DELTA_FRAME, FLAG_GPU_SURFACE};
-pub use gateway::{AsyncStreamGateway, ClientSession, StreamError};
+pub use gateway::{
+    AsyncStreamGateway, ClientSession, StreamError,
+    LocalSessionCache, GatewayRuntimeBuilder, spawn_blocking_shm_bridge,
+};
 
 #[cfg(test)]
 mod tests {
@@ -368,6 +371,148 @@ mod tests {
         gateway.shutdown();
     }
 
+    #[tokio::test]
+    async fn test_async_broadcast_lagged_client_backpressure() {
+        let hub = Arc::new(BroadcastHub::new(16));
+        // Small broadcast capacity of 4 to trigger Lagged backpressure easily
+        let gateway = Arc::new(AsyncStreamGateway::new(hub, 4));
+
+        let (mut session, _) = gateway.subscribe(BIT_WEBSOCKET).expect("Subscribe failed");
+
+        // Producer rapidly publishes 20 frames
+        for i in 1..=20 {
+            let frame = FramePayload::new_host(
+                i,
+                (i * 33_333) as u64,
+                640,
+                480,
+                1,
+                BIT_WEBSOCKET,
+                vec![i as u8; 50],
+            );
+            let _ = gateway.dispatch_frame(frame, FLAG_DELTA_FRAME);
+        }
+
+        // Slow receiver reads after queue overflow: recovers automatically without crashing
+        let latest = tokio::time::timeout(Duration::from_millis(200), session.recv_frame())
+            .await
+            .expect("Timeout waiting for frame")
+            .expect("Failed to receive latest frame");
+
+        // The received frame is one of the newest (e.g. >= 16), recovering from lagged state
+        assert!(latest.frame_id >= 16);
+    }
+
+    #[tokio::test]
+    async fn test_async_cancellation_safety_on_disconnect() {
+        let hub = Arc::new(BroadcastHub::new(16));
+        let gateway = Arc::new(AsyncStreamGateway::new(hub, 16));
+
+        assert_eq!(gateway.active_clients(), 0);
+
+        // Spawn client task and abort it abruptly
+        let gateway_clone = Arc::clone(&gateway);
+        let task = tokio::spawn(async move {
+            let (_session, _) = gateway_clone.subscribe(BIT_WEBSOCKET).expect("Subscribe failed");
+            assert_eq!(gateway_clone.active_clients(), 1);
+            // Simulate waiting forever until cancelled
+            tokio::time::sleep(Duration::from_secs(60)).await;
+        });
+
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        assert_eq!(gateway.active_clients(), 1);
+
+        // Abort task
+        task.abort();
+        let _ = task.await;
+
+        // Cancellation Safety: Dropping the ClientSession on abort decrements active_clients
+        assert_eq!(gateway.active_clients(), 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_async_multithread_high_concurrency_stress() {
+        let hub = Arc::new(BroadcastHub::new(32));
+        let gateway = Arc::new(AsyncStreamGateway::new(hub, 64));
+
+        let num_subscribers = 8;
+        let frames_to_send = 50;
+
+        let mut handles = Vec::new();
+        for _ in 0..num_subscribers {
+            let (mut session, _) = gateway.subscribe(BIT_WEBSOCKET).expect("Subscribe failed");
+            let handle = tokio::spawn(async move {
+                let mut count = 0;
+                while count < 30 {
+                    if let Ok(frame) = tokio::time::timeout(Duration::from_millis(150), session.recv_frame()).await {
+                        if frame.is_ok() {
+                            count += 1;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                count
+            });
+            handles.push(handle);
+        }
+
+        tokio::time::sleep(Duration::from_millis(20)).await;
+
+        // Producer task
+        let gateway_prod = Arc::clone(&gateway);
+        let prod_handle = tokio::spawn(async move {
+            for i in 1..=frames_to_send {
+                let frame = FramePayload::new_host(
+                    i,
+                    (i * 33_333) as u64,
+                    640,
+                    480,
+                    1,
+                    BIT_WEBSOCKET,
+                    vec![i as u8; 100],
+                );
+                let flags = if i == 1 { FLAG_KEYFRAME } else { FLAG_DELTA_FRAME };
+                let _ = gateway_prod.dispatch_frame(frame, flags);
+                tokio::time::sleep(Duration::from_millis(2)).await;
+            }
+        });
+
+        prod_handle.await.expect("Producer failed");
+
+        for h in handles {
+            let count = h.await.expect("Subscriber task failed");
+            assert!(count > 0, "Expected subscriber to receive frames");
+        }
+
+        gateway.shutdown();
+    }
+
+    #[tokio::test]
+    async fn test_async_graceful_shutdown() {
+        let hub = Arc::new(BroadcastHub::new(16));
+        let gateway = Arc::new(AsyncStreamGateway::new(hub, 16));
+
+        let (mut session, _) = gateway.subscribe(BIT_WEBSOCKET).expect("Subscribe failed");
+
+        let handle = tokio::spawn(async move {
+            session.recv_frame().await
+        });
+
+        tokio::time::sleep(Duration::from_millis(20)).await;
+
+        // Trigger graceful shutdown
+        gateway.shutdown();
+
+        // The receiver finishes with StreamError::GatewayClosed without hanging
+        let result = tokio::time::timeout(Duration::from_millis(100), handle)
+            .await
+            .expect("Shutdown timed out")
+            .expect("Task join error");
+
+        assert_eq!(result, Err(StreamError::GatewayClosed));
+    }
+
     #[test]
     fn test_stream_pipeline_builder() {
         let stream_id = "test_builder_stream";
@@ -417,4 +562,148 @@ mod tests {
         assert_eq!(passed, 3);
         assert_eq!(dropped, 3);
     }
+
+    #[test]
+    fn test_local_session_cache_unsafe_cell_borrow_free() {
+        let cache = LocalSessionCache::new();
+        assert!(cache.with_latest(|f| f.is_none()));
+
+        let frame = FramePayload::new_host(
+            100,
+            1_000_000,
+            640,
+            480,
+            1,
+            BIT_WEBSOCKET,
+            vec![255u8; 100],
+        );
+
+        cache.store(frame);
+
+        let id = cache.with_latest(|f| {
+            f.map(|frame_ref| frame_ref.frame_id).unwrap_or(0)
+        });
+        assert_eq!(id, 100);
+
+        cache.clear();
+        assert!(cache.with_latest(|f| f.is_none()));
+    }
+
+    #[test]
+    fn test_gateway_runtime_builder_ticks_and_threads() {
+        let rt = GatewayRuntimeBuilder::new()
+            .worker_threads(2)
+            .global_queue_interval(16)
+            .thread_name("test-gw-worker")
+            .build()
+            .expect("Failed to build customized Tokio runtime");
+
+        let res = rt.block_on(async {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+            42
+        });
+        assert_eq!(res, 42);
+    }
+
+    #[tokio::test]
+    async fn test_spawn_blocking_shm_bridge_to_async_gateway() {
+        let stream_id = "test_shm_bridge_stream";
+        let width = 32;
+        let height = 32;
+        let format = 1;
+        let slots = 4;
+
+        let mut writer = ShmWriter::create(stream_id, width, height, format, slots)
+            .expect("Failed to create ShmWriter");
+
+        let reader = ShmReader::open(stream_id)
+            .expect("Failed to open ShmReader");
+
+        let hub = Arc::new(BroadcastHub::new(16));
+        let gateway = Arc::new(AsyncStreamGateway::new(hub, 16));
+
+        let (mut session, _) = gateway.subscribe(BIT_WEBSOCKET)
+            .expect("Failed to subscribe to gateway");
+
+        // Write frame to SHM
+        let payload = vec![77u8; 32 * 32 * 3];
+        writer.write_frame(5_000_000, &payload).expect("Write frame failed");
+
+        // Execute blocking SHM bridge
+        let seq = spawn_blocking_shm_bridge(reader, Arc::clone(&gateway), BIT_WEBSOCKET, Some(Duration::from_secs(1)))
+            .await
+            .expect("SHM bridge failed");
+
+        assert_eq!(seq, 1);
+
+        // Async client receives frame seamlessly
+        let frame = session.recv_frame().await.expect("Failed to recv frame from gateway");
+        assert_eq!(frame.frame_id, 1);
+        let buf = frame.host_buffer().expect("Expected host buffer");
+        assert_eq!(buf.len(), 32 * 32 * 3);
+        assert_eq!(buf[0], 77);
+
+        gateway.shutdown();
+    }
+
+    #[tokio::test]
+    async fn test_deadlock_prevention_with_tokio_timeout() {
+        let sem = Arc::new(AtomicSemaphore::new(0)); // 0 permits initially
+
+        // Attempting to acquire with a strict Tokio timeout should timeout cleanly without deadlock
+        let sem_clone = Arc::clone(&sem);
+        let acquire_future = async move {
+            tokio::task::spawn_blocking(move || {
+                sem_clone.acquire(Some(Duration::from_millis(50)))
+            }).await.unwrap_or(false)
+        };
+
+        let result = tokio::time::timeout(Duration::from_millis(150), acquire_future)
+            .await
+            .expect("Timeout enclosing the test should not fire");
+
+        assert!(!result, "Semaphore acquire should have timed out internally");
+    }
+
+    #[test]
+    fn test_local_set_task_pinning_zero_task_stealing() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("Failed to build current_thread runtime");
+
+        let local_set = tokio::task::LocalSet::new();
+
+        let count = local_set.block_on(&rt, async {
+            let cache = Arc::new(LocalSessionCache::new());
+            let mut tasks = Vec::new();
+
+            for i in 1..=5 {
+                let cache_clone = Arc::clone(&cache);
+                tasks.push(tokio::task::spawn_local(async move {
+                    let frame = FramePayload::new_host(
+                        i,
+                        (i * 10_000) as u64,
+                        320,
+                        240,
+                        1,
+                        BIT_WEBSOCKET,
+                        vec![i as u8; 50],
+                    );
+                    cache_clone.store(frame);
+                    cache_clone.with_latest(|f| f.map(|f_ref| f_ref.frame_id).unwrap_or(0))
+                }));
+            }
+
+            let mut sum = 0;
+            for t in tasks {
+                sum += t.await.unwrap_or(0);
+            }
+            sum
+        });
+
+        // The tasks ran on the pinned local thread set without inter-thread stealing
+        assert!(count > 0);
+    }
 }
+

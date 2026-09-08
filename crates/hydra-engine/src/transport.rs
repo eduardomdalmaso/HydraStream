@@ -242,7 +242,7 @@ impl<T> Drop for RcuConfig<T> {
 // 5. Frame Payload & Zero-Overhead Memory Layout (MaybeUninit)
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FrameStorage {
     HostMemory {
         buffer: Arc<[u8]>,
@@ -255,7 +255,7 @@ pub enum FrameStorage {
     },
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FramePayload {
     pub frame_id: u64,
     pub timestamp_us: u64,
@@ -313,6 +313,14 @@ impl FramePayload {
                 dma_buf_fd: None,
                 pitch_stride,
             }),
+        }
+    }
+
+    #[inline(always)]
+    pub fn host_buffer(&self) -> Option<&[u8]> {
+        match &*self.storage {
+            FrameStorage::HostMemory { buffer } => Some(buffer),
+            _ => None,
         }
     }
 }
