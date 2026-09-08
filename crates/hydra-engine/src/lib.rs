@@ -5,6 +5,11 @@ pub mod transport;
 pub mod sync;
 pub mod codec;
 pub mod gateway;
+pub mod actor;
+pub mod coroutine;
+pub mod resilience;
+pub mod decorator;
+pub mod isolated;
 pub mod ffi;
 
 pub use shm::{ShmWriter, ShmReader, ShmHeader, SlotHeader};
@@ -21,6 +26,11 @@ pub use gateway::{
     AsyncStreamGateway, ClientSession, StreamError,
     LocalSessionCache, GatewayRuntimeBuilder, spawn_blocking_shm_bridge,
 };
+pub use actor::{GopActorHandle, GopStats};
+pub use coroutine::{SymmetricCoroutine, CoroutineYield, NalClassifierCoroutine, FpsFilterCoroutine};
+pub use resilience::{StreamCircuitBreaker, CircuitState};
+pub use decorator::{TelemetryFuture, TelemetryExt, FutureMetricsSink};
+pub use isolated::{SyncGatewayBridge, SyncReceiver};
 
 #[cfg(test)]
 mod tests {
@@ -705,5 +715,173 @@ mod tests {
         // The tasks ran on the pinned local thread set without inter-thread stealing
         assert!(count > 0);
     }
+
+    #[tokio::test]
+    async fn test_actor_model_gop_tracker_no_locks() {
+        let actor = GopActorHandle::spawn(32);
+
+        // Record a sequence of frames concurrently via Actor messages
+        let mut handles = Vec::new();
+        for i in 1..=20 {
+            let actor_clone = actor.clone();
+            handles.push(tokio::spawn(async move {
+                let flags = if i == 1 || i == 15 { FLAG_KEYFRAME } else { FLAG_DELTA_FRAME };
+                let payload = FramePayload::new_host(
+                    i,
+                    (i * 33_333) as u64,
+                    640,
+                    480,
+                    1,
+                    BIT_WEBSOCKET,
+                    vec![i as u8; 50],
+                );
+                actor_clone.record_frame(i, flags, Some(payload)).await
+            }));
+        }
+
+        for h in handles {
+            h.await.expect("Actor task failed").expect("Send message failed");
+        }
+
+        // Query Actor state via oneshot reply channel
+        let latest_kf = actor.get_latest_keyframe().await.expect("Get latest keyframe failed");
+        assert!(latest_kf.is_some());
+        assert_eq!(latest_kf.unwrap().frame_id, 15);
+
+        let stats = actor.get_gop_stats().await.expect("Get GOP stats failed");
+        assert_eq!(stats.latest_keyframe_seq, 15);
+        assert_eq!(stats.total_frames_tracked, 20);
+
+        actor.shutdown().await;
+    }
+
+    #[test]
+    fn test_symmetric_coroutines_pipeline_chain() {
+        let nal_coro = NalClassifierCoroutine::new(false);
+        let fps_coro = FpsFilterCoroutine::new(10.0); // 10 FPS (100,000 us interval)
+
+        // Symmetrically chain coroutines in the same stack frame
+        let mut pipeline_coro = nal_coro.then(fps_coro);
+
+        let idr_bytes = vec![0x00, 0x00, 0x00, 0x01, 0x65, 0x88];
+        let p_bytes = vec![0x00, 0x00, 0x00, 0x01, 0x41, 0x9A];
+
+        let f1 = FramePayload::new_host(1, 0, 640, 480, 1, BIT_ALL, idr_bytes);
+        let f2 = FramePayload::new_host(2, 30_000, 640, 480, 1, BIT_ALL, p_bytes.clone());
+        let f3 = FramePayload::new_host(3, 110_000, 640, 480, 1, BIT_ALL, p_bytes);
+
+        // Frame 1: Keyframe -> should pass
+        match pipeline_coro.resume(f1) {
+            CoroutineYield::Continue((_, flags)) => {
+                assert_eq!(flags & FLAG_KEYFRAME, FLAG_KEYFRAME);
+            }
+            CoroutineYield::Skip => panic!("Keyframe should not be skipped"),
+        }
+
+        // Frame 2: 30ms -> too soon for 10 FPS -> should skip
+        match pipeline_coro.resume(f2) {
+            CoroutineYield::Continue(_) => panic!("Frame 2 should have been skipped by FPS filter"),
+            CoroutineYield::Skip => {}
+        }
+
+        // Frame 3: 110ms -> elapsed > 100ms -> should pass
+        match pipeline_coro.resume(f3) {
+            CoroutineYield::Continue((payload, _)) => {
+                assert_eq!(payload.frame_id, 3);
+            }
+            CoroutineYield::Skip => panic!("Frame 3 should have passed"),
+        }
+    }
+
+    #[test]
+    fn test_circuit_breaker_fast_fail_and_recovery() {
+        let cb = StreamCircuitBreaker::new(3, Duration::from_millis(50));
+        assert_eq!(cb.state(), CircuitState::Closed);
+        assert!(cb.allow_request());
+
+        // 3 consecutive failures trigger OPEN state
+        cb.record_failure();
+        cb.record_failure();
+        cb.record_failure();
+
+        assert_eq!(cb.state(), CircuitState::Open);
+        // Fast-fail: Immediate rejection without creating tasks
+        assert!(!cb.allow_request());
+
+        // Wait for cooldown
+        std::thread::sleep(Duration::from_millis(60));
+
+        // After cooldown, transitions to HalfOpen on request
+        assert!(cb.allow_request());
+        assert_eq!(cb.state(), CircuitState::HalfOpen);
+
+        // Successful probe requests recover the circuit back to Closed
+        cb.record_success();
+        cb.record_success();
+        cb.record_success();
+
+        assert_eq!(cb.state(), CircuitState::Closed);
+        assert!(cb.allow_request());
+    }
+
+    #[tokio::test]
+    async fn test_future_decorator_telemetry_profiling() {
+        let sink = Arc::new(FutureMetricsSink::new());
+
+        let async_task = async {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            123
+        };
+
+        // Wrap future with TelemetryFuture decorator
+        let decorated = async_task.with_telemetry(Arc::clone(&sink));
+        let result = decorated.await;
+        assert_eq!(result, 123);
+
+        let (polls, completions, latency_nanos) = sink.stats();
+        assert!(polls >= 1, "Expected at least 1 poll");
+        assert_eq!(completions, 1);
+        assert!(latency_nanos > 0, "Expected measured latency");
+    }
+
+    #[test]
+    fn test_isolated_module_pattern_sync_bridge() {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .expect("Failed to build Tokio runtime");
+
+        let hub = Arc::new(BroadcastHub::new(16));
+        let gateway = Arc::new(AsyncStreamGateway::new(hub, 16));
+        let sync_bridge = SyncGatewayBridge::new(gateway, rt.handle().clone());
+
+        // Subscribe synchronously - returns crossbeam SyncReceiver without async/await
+        let (sync_rx, _) = sync_bridge.subscribe_sync(BIT_WEBSOCKET, 8)
+            .expect("Failed to subscribe synchronously");
+
+        assert_eq!(sync_bridge.active_clients_sync(), 1);
+
+        // Dispatch synchronously from caller thread
+        let payload = FramePayload::new_host(
+            999,
+            1_000_000,
+            640,
+            480,
+            1,
+            BIT_WEBSOCKET,
+            vec![88u8; 100],
+        );
+        let dispatched = sync_bridge.dispatch_frame_sync(payload, 0).expect("Dispatch sync failed");
+        assert!(dispatched > 0);
+
+        // Synchronous receive without async keywords
+        let received = sync_rx.recv_timeout(Duration::from_secs(1))
+            .expect("Sync receive timed out");
+        assert_eq!(received.frame_id, 999);
+
+        sync_bridge.shutdown_sync();
+    }
 }
+
 
