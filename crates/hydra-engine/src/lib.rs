@@ -3,17 +3,21 @@ pub mod governor;
 pub mod pipeline;
 pub mod transport;
 pub mod sync;
+pub mod codec;
+pub mod gateway;
 pub mod ffi;
 
 pub use shm::{ShmWriter, ShmReader, ShmHeader, SlotHeader};
 pub use governor::FpsGovernor;
-pub use pipeline::StreamPipeline;
+pub use pipeline::{StreamPipeline, StreamPipelineBuilder};
 pub use transport::{
     BroadcastHub, FramePayload, FrameStorage, LockFreePeerList, RcuConfig,
     CacheAlignedAtomicU64, CacheAlignedAtomicU32,
     BIT_WEBSOCKET, BIT_WEBRTC, BIT_ANALYTICS, BIT_ALL,
 };
 pub use sync::{AtomicSemaphore, HybridMutex, ParkingTable};
+pub use codec::{NalParser, NalType, GopTracker, FLAG_KEYFRAME, FLAG_SPS_PPS, FLAG_DELTA_FRAME, FLAG_GPU_SURFACE};
+pub use gateway::{AsyncStreamGateway, ClientSession, StreamError};
 
 #[cfg(test)]
 mod tests {
@@ -84,14 +88,12 @@ mod tests {
                 .expect("Failed to open ShmReader in background thread");
             let mut buf = Vec::new();
             
-            // This blocks using Futex (0% CPU) until the writer writes the frame
             let meta = reader.wait_and_read_frame(&mut buf, Some(Duration::from_secs(2)))
                 .expect("Futex wait error")
                 .expect("Expected frame meta");
             (meta.sequence, buf)
         });
 
-        // Sleep briefly to ensure reader is blocked on Futex
         thread::sleep(Duration::from_millis(50));
 
         let frame_data = vec![99u8; 32 * 32 * 3];
@@ -137,7 +139,6 @@ mod tests {
         assert_eq!(rcu.load().width, 1920);
         assert_eq!(rcu.load().fps, 30);
 
-        // Update dynamically
         rcu.update(CamConfig { width: 3840, fps: 60 });
         assert_eq!(rcu.load().width, 3840);
         assert_eq!(rcu.load().fps, 60);
@@ -147,7 +148,6 @@ mod tests {
     fn test_broadcast_hub_selective_bitset_concurrency() {
         let hub = Arc::new(BroadcastHub::new(16));
         
-        // Consumer 1: Only interested in BIT_WEBSOCKET
         let hub_ws = Arc::clone(&hub);
         let handle_ws = thread::spawn(move || {
             let mut received = Vec::new();
@@ -163,7 +163,6 @@ mod tests {
             received
         });
 
-        // Consumer 2: Only interested in BIT_WEBRTC
         let hub_webrtc = Arc::clone(&hub);
         let handle_webrtc = thread::spawn(move || {
             let mut received = Vec::new();
@@ -181,7 +180,6 @@ mod tests {
 
         thread::sleep(Duration::from_millis(50));
 
-        // Publish alternating frames
         for i in 1..=10 {
             let mask = if i % 2 == 0 { BIT_WEBSOCKET } else { BIT_WEBRTC };
             let payload = FramePayload::new_host(
@@ -202,31 +200,27 @@ mod tests {
 
         assert_eq!(ws_frames.len(), 5);
         assert_eq!(webrtc_frames.len(), 5);
-        
         assert_eq!(ws_frames, vec![2, 4, 6, 8, 10]);
         assert_eq!(webrtc_frames, vec![1, 3, 5, 7, 9]);
     }
 
     #[test]
     fn test_atomic_semaphore_backpressure() {
-        let sem = Arc::new(AtomicSemaphore::new(2)); // Buffer capacity = 2 permits
+        let sem = Arc::new(AtomicSemaphore::new(2));
         assert_eq!(sem.available(), 2);
 
         assert!(sem.acquire(Some(Duration::from_millis(10))));
         assert!(sem.acquire(Some(Duration::from_millis(10))));
         assert_eq!(sem.available(), 0);
 
-        // Third acquire should timeout because permits = 0
         assert!(!sem.acquire(Some(Duration::from_millis(20))));
 
-        // Release 1 permit from another thread
         let sem_clone = Arc::clone(&sem);
         thread::spawn(move || {
             thread::sleep(Duration::from_millis(30));
             sem_clone.release();
         });
 
-        // Now acquire succeeds
         assert!(sem.acquire(Some(Duration::from_secs(1))));
     }
 
@@ -259,7 +253,6 @@ mod tests {
 
         let table_clone = Arc::clone(&table);
         let handle = thread::spawn(move || {
-            // Park on address
             table_clone.park(test_addr, Some(Duration::from_secs(2)))
         });
 
@@ -272,7 +265,6 @@ mod tests {
 
     #[test]
     fn test_scoped_threads_zero_arc_dispatch() {
-        // Scoped distribution without any Arc cloning (0 atomic overhead)
         let frame = FramePayload::new_host(
             42,
             1_000_000,
@@ -285,10 +277,9 @@ mod tests {
 
         let mut results = vec![0u8; 4];
 
-        // Mara Bos Chapter 1: thread::scope guarantees threads don't outlive the scope
         thread::scope(|s| {
             for (idx, slot) in results.iter_mut().enumerate() {
-                let frame_ref = &frame; // Pure borrowed reference, no Arc!
+                let frame_ref = &frame;
                 s.spawn(move || {
                     assert_eq!(frame_ref.frame_id, 42);
                     *slot = (idx as u8) + 1;
@@ -297,6 +288,118 @@ mod tests {
         });
 
         assert_eq!(results, vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn test_nal_unit_parsing_and_gop_tracker() {
+        let h264_idr = [0x00, 0x00, 0x00, 0x01, 0x65, 0x88, 0x84];
+        let h264_sps = [0x00, 0x00, 0x01, 0x67, 0x42, 0x00];
+        let h264_p_frame = [0x00, 0x00, 0x01, 0x41, 0x9A];
+
+        assert_eq!(NalParser::parse_nal_type(&h264_idr, false), NalType::H264Idr);
+        assert_eq!(NalParser::parse_nal_type(&h264_sps, false), NalType::H264Sps);
+        assert_eq!(NalParser::parse_nal_type(&h264_p_frame, false), NalType::H264NonIdr);
+
+        let tracker = GopTracker::new();
+        tracker.record_frame(1, FLAG_KEYFRAME);
+        assert_eq!(tracker.latest_keyframe_seq(), 1);
+
+        for i in 2..=30 {
+            tracker.record_frame(i, FLAG_DELTA_FRAME);
+        }
+        assert_eq!(tracker.latest_keyframe_seq(), 1);
+
+        tracker.record_frame(31, FLAG_KEYFRAME);
+        assert_eq!(tracker.latest_keyframe_seq(), 31);
+        assert_eq!(tracker.gop_size(), 30);
+    }
+
+    #[tokio::test]
+    async fn test_async_stream_gateway_tokio_multiclient() {
+        let hub = Arc::new(BroadcastHub::new(16));
+        let gateway = Arc::new(AsyncStreamGateway::new(hub, 32));
+
+        // Pre-publish a keyframe
+        let keyframe = FramePayload::new_host(
+            1,
+            1_000_000,
+            1920,
+            1080,
+            1,
+            BIT_WEBSOCKET,
+            vec![10u8; 100],
+        );
+        let _ = gateway.dispatch_frame(keyframe, FLAG_KEYFRAME);
+
+        // Client 1 connects and immediately gets initial keyframe
+        let (mut session1, initial_kf) = gateway.subscribe(BIT_WEBSOCKET).expect("Subscribe failed");
+        assert!(initial_kf.is_some());
+        assert_eq!(initial_kf.unwrap().frame_id, 1);
+        assert_eq!(gateway.active_clients(), 1);
+
+        // Spawn async receiver task
+        let handle = tokio::spawn(async move {
+            let mut received = Vec::new();
+            for _ in 0..3 {
+                if let Ok(frame) = session1.receiver.recv().await {
+                    received.push(frame.frame_id);
+                }
+            }
+            received
+        });
+
+        // Publish 3 delta frames
+        for i in 2..=4 {
+            let p_frame = FramePayload::new_host(
+                i,
+                (i * 33_333) as u64,
+                1920,
+                1080,
+                1,
+                BIT_WEBSOCKET,
+                vec![i as u8; 100],
+            );
+            let _ = gateway.dispatch_frame(p_frame, FLAG_DELTA_FRAME);
+        }
+
+        let received_ids = handle.await.expect("Tokio task failed");
+        assert_eq!(received_ids, vec![2, 3, 4]);
+
+        gateway.shutdown();
+    }
+
+    #[test]
+    fn test_stream_pipeline_builder() {
+        let stream_id = "test_builder_stream";
+        let pipeline = StreamPipeline::builder(stream_id)
+            .with_resolution(1280, 720)
+            .with_format(1)
+            .with_slots(8)
+            .with_consumer("yolo_analytic", 2.0, "rgb24")
+            .with_consumer("web_preview", 15.0, "jpeg")
+            .build()
+            .expect("Failed to build pipeline via builder");
+
+        assert_eq!(pipeline.width, 1280);
+        assert_eq!(pipeline.height, 720);
+        assert_eq!(pipeline.consumers.len(), 2);
+    }
+
+    #[test]
+    fn test_nal_parser_malformed_fuzz_safety() {
+        // Fuzz-like safety checks against empty, truncated, and corrupt byte sequences
+        assert_eq!(NalParser::parse_nal_type(&[], false), NalType::Unknown);
+        assert_eq!(NalParser::parse_nal_type(&[0], false), NalType::Unknown);
+        assert_eq!(NalParser::parse_nal_type(&[0, 0], false), NalType::Unknown);
+        assert_eq!(NalParser::parse_nal_type(&[0, 0, 1], false), NalType::Unknown);
+        assert_eq!(NalParser::parse_nal_type(&[0, 0, 0, 1], false), NalType::Unknown);
+        assert_eq!(NalParser::parse_nal_type(&[0xFF, 0xEE, 0xDD, 0xCC], false), NalType::Unknown);
+
+        // Valid with trailing corrupt bytes
+        let mut malformed_stream = vec![0, 0, 1, 0x65]; // IDR
+        malformed_stream.extend_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF]);
+        assert_eq!(NalParser::parse_nal_type(&malformed_stream, false), NalType::H264Idr);
+        assert_eq!(NalParser::classify_frame_flags(&malformed_stream, false), FLAG_KEYFRAME | FLAG_SPS_PPS);
     }
 
     #[test]

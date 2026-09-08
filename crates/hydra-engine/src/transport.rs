@@ -375,7 +375,10 @@ impl BroadcastHub {
     pub fn publish(&self, frame: FramePayload) -> u64 {
         let seq = self.head_seq.value.load(Ordering::Relaxed) + 1;
         let slot_idx = (seq as usize) % self.capacity;
-        let slot = &self.slots[slot_idx];
+        let slot = match self.slots.get(slot_idx) {
+            Some(s) => s,
+            None => return 0,
+        };
 
         let frame_mask = frame.mask;
 
@@ -416,14 +419,14 @@ impl BroadcastHub {
             let current_head = self.head_seq.value.load(Ordering::Acquire);
             if current_head > last_seen_seq {
                 let slot_idx = (current_head as usize) % self.capacity;
-                let slot = &self.slots[slot_idx];
-
-                if slot.sequence.load(Ordering::Acquire) == current_head {
-                    unsafe {
-                        let ptr = slot.payload.get();
-                        let payload_ref = (*ptr).assume_init_ref();
-                        if (payload_ref.mask & interest_mask) != 0 {
-                            return Some(payload_ref.clone());
+                if let Some(slot) = self.slots.get(slot_idx) {
+                    if slot.sequence.load(Ordering::Acquire) == current_head {
+                        unsafe {
+                            let ptr = slot.payload.get();
+                            let payload_ref = (*ptr).assume_init_ref();
+                            if (payload_ref.mask & interest_mask) != 0 {
+                                return Some(payload_ref.clone());
+                            }
                         }
                     }
                 }
@@ -448,14 +451,14 @@ impl BroadcastHub {
         let current_head = self.head_seq.value.load(Ordering::Acquire);
         if current_head > last_seen_seq {
             let slot_idx = (current_head as usize) % self.capacity;
-            let slot = &self.slots[slot_idx];
-
-            if slot.sequence.load(Ordering::Acquire) == current_head {
-                unsafe {
-                    let ptr = slot.payload.get();
-                    let payload_ref = (*ptr).assume_init_ref();
-                    if (payload_ref.mask & interest_mask) != 0 {
-                        return Some(payload_ref.clone());
+            if let Some(slot) = self.slots.get(slot_idx) {
+                if slot.sequence.load(Ordering::Acquire) == current_head {
+                    unsafe {
+                        let ptr = slot.payload.get();
+                        let payload_ref = (*ptr).assume_init_ref();
+                        if (payload_ref.mask & interest_mask) != 0 {
+                            return Some(payload_ref.clone());
+                        }
                     }
                 }
             }

@@ -206,15 +206,22 @@ for frame in reader.stream():
 
 ---
 
-## Roadmap
+## Fundamentos de Engenharia & Literatura de Referência
 
-- [x] **Fase 1:** Demuxer RTSP / TCP RTP nativo em Go (RFC 2326) e motor de ingestão.
-- [x] **Fase 2:** Ring buffer circular lock-free em memória compartilhada POSIX (`/dev/shm`) em Rust.
-- [x] **Fase 3:** Smart microsecond FPS Governor e exportação FFI C-ABI.
-- [x] **Fase 4:** Detecção dinâmica de GPU NVIDIA (RTX 5090 / 4090 / CUDA 13.3).
-- [x] **Fase 5:** SDK Python Zero-Copy (`sdk/python`) para Ultralytics YOLO e OpenCV.
-- [x] **Fase 6:** Dashboard Web UI em tempo real com gráficos SVG Bézier e conformidade DDD.
-- [ ] **Fase 7:** Helm Chart DaemonSet para Kubernetes e encaminhamento gRPC para Triton Cluster.
+Os pilares arquiteturais do **Data Plane & Engine do HydraStream** (`crates/hydra-engine`) foram construídos diretamente sobre os princípios da literatura de engenharia de sistemas e concorrência em Rust:
+
+1. 📖 **"Rust Atomics and Locks" por Mara Bos (O'Reilly)**
+   - **Protocolo MESI e Isolamento de Linhas de Cache:** Alinhamento estrito a 64 bytes (`#[repr(align(64))]`) em `ShmHeader` e `SlotHeader`, eliminando *False Sharing* nas caches L1/L2.
+   - **Ordenação Formal Happens-Before:** Uso rigoroso de `Ordering::Release` em produtores e `Ordering::Acquire` em consumidores, garantindo consistência de memória *zero-copy*.
+   - **Sincronização com Futex do Kernel (`SYS_futex`):** Espera baseada em endereço com despertar seletivo por Bitsets (`FUTEX_WAIT_BITSET` / `FUTEX_WAKE_BITSET`), eliminando a *manada tonante (thundering herd)* com 0% de uso de CPU em repouso.
+   - **Concorrência Lock-Free & RCU:** Listas encadeadas com `AtomicPtr` e padrão Read-Copy-Update (`RcuConfig`) para atualizações dinâmicas de peers e metadados sem bloquear os leitores.
+   - **Sincronização Híbrida Adaptativa:** `HybridMutex` de 3 estados (com até 100 iterações de *spin* via `std::hint::spin_loop()` antes da syscall) e tabela centralizada `ParkingTable`.
+
+2. 📖 **"Effective Rust" por David Drysdale**
+   - **Robustez do Type System & Enums Ricos:** Modelagem de invariantes de estado em tempo de compilação.
+   - **Propagação Limpa de Erros:** Uso sistemático de `Result<T, StreamError>` e operador `?` com custo zero de runtime.
+   - **Escopo Estrito de Locks (Item 17):** Delimitação atômica de seções críticas para prevenção total de *Deadlocks* e inversão de prioridade.
+   - **Minimização de Visibilidade:** Encapsulamento com `pub(crate)` protegendo detalhes internos e expondo APIs limpas para C-ABI e Gateway Assíncrono Tokio.
 
 ---
 

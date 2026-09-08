@@ -1,4 +1,5 @@
 //! HydraStream Video Pipeline Engine
+//! Includes StreamPipelineBuilder implementing the Builder Pattern (Effective Rust Item 7).
 
 use std::collections::HashMap;
 use std::io;
@@ -40,6 +41,10 @@ impl StreamPipeline {
         })
     }
 
+    pub fn builder(stream_id: &str) -> StreamPipelineBuilder {
+        StreamPipelineBuilder::new(stream_id)
+    }
+
     pub fn register_consumer(&mut self, analytic_type: &str, target_fps: f64, format: &str) {
         let engine = ConsumerEngine {
             analytic_type: analytic_type.to_string(),
@@ -73,5 +78,65 @@ impl StreamPipeline {
         } else {
             0.0
         }
+    }
+}
+
+/// Builder Pattern for StreamPipeline configuration (Effective Rust Item 7)
+pub struct StreamPipelineBuilder {
+    stream_id: String,
+    width: u32,
+    height: u32,
+    format: u32,
+    slot_count: usize,
+    consumers: Vec<(String, f64, String)>,
+}
+
+impl StreamPipelineBuilder {
+    pub fn new(stream_id: &str) -> Self {
+        Self {
+            stream_id: stream_id.to_string(),
+            width: 1920,
+            height: 1080,
+            format: 1, // RGB24
+            slot_count: 16,
+            consumers: Vec::new(),
+        }
+    }
+
+    pub fn with_resolution(mut self, width: u32, height: u32) -> Self {
+        self.width = width;
+        self.height = height;
+        self
+    }
+
+    pub fn with_format(mut self, format: u32) -> Self {
+        self.format = format;
+        self
+    }
+
+    pub fn with_slots(mut self, slots: usize) -> Self {
+        self.slot_count = slots;
+        self
+    }
+
+    pub fn with_consumer(mut self, analytic_type: &str, target_fps: f64, format: &str) -> Self {
+        self.consumers.push((analytic_type.to_string(), target_fps, format.to_string()));
+        self
+    }
+
+    pub fn build(self) -> io::Result<StreamPipeline> {
+        let mut pipeline = StreamPipeline::new(
+            &self.stream_id,
+            self.width,
+            self.height,
+            self.format,
+            self.slot_count,
+        )?;
+
+        for (analytic_type, target_fps, format) in self.consumers {
+            pipeline.register_consumer(&analytic_type, target_fps, &format);
+        }
+
+        Ok(pipeline)
     }
 }

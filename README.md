@@ -206,15 +206,22 @@ for frame in reader.stream():
 
 ---
 
-## Roadmap
+## Foundational Engineering & Literature
 
-- [x] **Phase 1:** Native Go RFC 2326 RTSP / TCP RTP demuxer and ingest engine.
-- [x] **Phase 2:** Rust POSIX Shared Memory (`/dev/shm`) lock-free circular ring buffer.
-- [x] **Phase 3:** Smart microsecond FPS Governor and C-ABI FFI export.
-- [x] **Phase 4:** Real-time NVIDIA GPU hardware auto-detection (RTX 5090 / 4090 / CUDA 13.3).
-- [x] **Phase 5:** Python Zero-Copy SDK (`sdk/python`) for Ultralytics YOLO & OpenCV.
-- [x] **Phase 6:** Real-time Dashboard Web UI with live SVG Bézier charts and DDD compliance.
-- [ ] **Phase 7:** Multi-node Kubernetes DaemonSet Helm Chart & Triton gRPC cluster forwarding.
+The architectural pillars of the **HydraStream Data Plane & Engine** (`crates/hydra-engine`) are built directly upon the core principles of high-performance systems engineering and modern Rust literature:
+
+1. 📖 **"Rust Atomics and Locks" by Mara Bos (O'Reilly)**
+   - **Hardware MESI & Cache Line Isolation:** Explicit `#[repr(align(64))]` and 64-byte padded headers (`ShmHeader`, `SlotHeader`) eliminating L1/L2 False Sharing.
+   - **Formal Happens-Before Ordering:** Strict `Ordering::Release` on producers and `Ordering::Acquire` on consumers guaranteeing zero-copy memory visibility.
+   - **Linux Futex Synchronization (`SYS_futex`):** Address-based waiting with selective Bitset Waking (`FUTEX_WAIT_BITSET` / `FUTEX_WAKE_BITSET`) preventing Thundering Herd problems with 0% CPU consumption during idle states.
+   - **Lock-Free Concurrency & RCU:** Atomic pointer linked lists (`AtomicPtr`) and Read-Copy-Update (`RcuConfig`) for dynamic peer and stream metadata updates without blocking read paths.
+   - **Adaptive Hybrid Synchronization:** 3-State `HybridMutex` (adaptive spin with `std::hint::spin_loop()` before syscall) and centralized `ParkingTable` wait queues.
+
+2. 📖 **"Effective Rust" by David Drysdale**
+   - **Idiomatic Type System & Rich Enums:** Type-safe state modeling eliminating invalid runtime states at compile time.
+   - **Zero-Cost Error Propagation:** Explicit `Result<T, StreamError>` and `?` operators with zero runtime penalty.
+   - **Minimized Lock Scopes (Item 17):** Strict containment of synchronization boundaries preventing Deadlocks and Lock Inversion.
+   - **Visibility Minimization:** Granular `pub(crate)` encapsulation keeping internal engine details protected while exposing clean C-ABI and Async Gateway APIs.
 
 ---
 

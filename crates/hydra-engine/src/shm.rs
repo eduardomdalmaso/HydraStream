@@ -181,6 +181,9 @@ impl ShmWriter {
         let slot_idx = (seq as usize) % self.slot_count;
         let header_size = std::mem::size_of::<ShmHeader>();
         let slot_offset = header_size + (slot_idx * self.slot_size);
+        if slot_offset + self.slot_size > self.mmap.len() {
+            return Err(io::Error::new(ErrorKind::UnexpectedEof, "Slot offset out of bounds"));
+        }
 
         let slot_header = SlotHeader {
             sequence: seq,

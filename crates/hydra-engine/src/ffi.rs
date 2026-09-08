@@ -1,7 +1,9 @@
 //! C-ABI Foreign Function Interface (FFI) for Go and Python interop
+//! Hardened with std::panic::catch_unwind across all entrypoints (Effective Rust Item 34).
 
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_uchar};
+use std::panic::catch_unwind;
 use crate::shm::{ShmReader, ShmWriter, SlotHeader};
 
 #[no_mangle]
@@ -15,16 +17,21 @@ pub unsafe extern "C" fn hydra_shm_create(
     if stream_id.is_null() {
         return std::ptr::null_mut();
     }
-    let c_str = CStr::from_ptr(stream_id);
-    let id = match c_str.to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
-    };
 
-    match ShmWriter::create(id, width, height, format, slot_count) {
-        Ok(writer) => Box::into_raw(Box::new(writer)),
-        Err(_) => std::ptr::null_mut(),
-    }
+    let result = catch_unwind(|| {
+        let c_str = CStr::from_ptr(stream_id);
+        let id = match c_str.to_str() {
+            Ok(s) => s,
+            Err(_) => return std::ptr::null_mut(),
+        };
+
+        match ShmWriter::create(id, width, height, format, slot_count) {
+            Ok(writer) => Box::into_raw(Box::new(writer)),
+            Err(_) => std::ptr::null_mut(),
+        }
+    });
+
+    result.unwrap_or(std::ptr::null_mut())
 }
 
 #[no_mangle]
@@ -37,19 +44,26 @@ pub unsafe extern "C" fn hydra_shm_write(
     if handle.is_null() || data.is_null() {
         return -1;
     }
-    let writer = &mut *handle;
-    let slice = std::slice::from_raw_parts(data, len);
 
-    match writer.write_frame(timestamp_us, slice) {
-        Ok(seq) => seq as i64,
-        Err(_) => -1,
-    }
+    let result = catch_unwind(|| {
+        let writer = &mut *handle;
+        let slice = std::slice::from_raw_parts(data, len);
+
+        match writer.write_frame(timestamp_us, slice) {
+            Ok(seq) => seq as i64,
+            Err(_) => -1,
+        }
+    });
+
+    result.unwrap_or(-1)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn hydra_shm_destroy(handle: *mut ShmWriter) {
     if !handle.is_null() {
-        let _ = Box::from_raw(handle);
+        let _ = catch_unwind(|| {
+            let _ = Box::from_raw(handle);
+        });
     }
 }
 
@@ -58,22 +72,29 @@ pub unsafe extern "C" fn hydra_shm_reader_open(stream_id: *const c_char) -> *mut
     if stream_id.is_null() {
         return std::ptr::null_mut();
     }
-    let c_str = CStr::from_ptr(stream_id);
-    let id = match c_str.to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
-    };
 
-    match ShmReader::open(id) {
-        Ok(reader) => Box::into_raw(Box::new(reader)),
-        Err(_) => std::ptr::null_mut(),
-    }
+    let result = catch_unwind(|| {
+        let c_str = CStr::from_ptr(stream_id);
+        let id = match c_str.to_str() {
+            Ok(s) => s,
+            Err(_) => return std::ptr::null_mut(),
+        };
+
+        match ShmReader::open(id) {
+            Ok(reader) => Box::into_raw(Box::new(reader)),
+            Err(_) => std::ptr::null_mut(),
+        }
+    });
+
+    result.unwrap_or(std::ptr::null_mut())
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn hydra_shm_reader_close(handle: *mut ShmReader) {
     if !handle.is_null() {
-        let _ = Box::from_raw(handle);
+        let _ = catch_unwind(|| {
+            let _ = Box::from_raw(handle);
+        });
     }
 }
 
@@ -87,21 +108,26 @@ pub unsafe extern "C" fn hydra_shm_read_latest(
     if handle.is_null() || out_buf.is_null() {
         return -1;
     }
-    let reader = &mut *handle;
-    let mut temp = Vec::new();
 
-    match reader.read_latest_frame(&mut temp) {
-        Ok(Some(meta)) => {
-            if temp.len() > max_len {
-                return -2;
+    let result = catch_unwind(|| {
+        let reader = &mut *handle;
+        let mut temp = Vec::new();
+
+        match reader.read_latest_frame(&mut temp) {
+            Ok(Some(meta)) => {
+                if temp.len() > max_len {
+                    return -2;
+                }
+                std::ptr::copy_nonoverlapping(temp.as_ptr(), out_buf, temp.len());
+                if !out_meta.is_null() {
+                    std::ptr::write_volatile(out_meta, meta);
+                }
+                temp.len() as c_int
             }
-            std::ptr::copy_nonoverlapping(temp.as_ptr(), out_buf, temp.len());
-            if !out_meta.is_null() {
-                std::ptr::write_volatile(out_meta, meta);
-            }
-            temp.len() as c_int
+            Ok(None) => 0, // No new frame
+            Err(_) => -1,
         }
-        Ok(None) => 0, // No new frame
-        Err(_) => -1,
-    }
+    });
+
+    result.unwrap_or(-1)
 }
