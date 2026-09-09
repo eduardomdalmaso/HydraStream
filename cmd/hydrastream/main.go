@@ -15,6 +15,7 @@ import (
 	"hydrastream/internal/adapters/secondary/gpu"
 	"hydrastream/internal/adapters/secondary/ingest"
 	"hydrastream/internal/adapters/secondary/memory"
+	natsAdapter "hydrastream/internal/adapters/secondary/nats"
 	"hydrastream/internal/adapters/secondary/onvif"
 	"hydrastream/internal/application"
 )
@@ -81,6 +82,14 @@ func main() {
 	// 5. Start Embedded MediaMTX RTSP server if not already running
 	mtxCmd := startEmbeddedMediaMTX()
 
+	// 6. Connect to NATS Event Mesh if available
+	natsPub, err := natsAdapter.NewStreamNATSPublisher("nats://localhost:4222")
+	if err != nil {
+		log.Printf("⚠️ [HydraStream] NATS Event Mesh not reachable: %v (continuing standalone mode)\n", err)
+	} else {
+		log.Println("✅ [HydraStream] NATS Event Mesh connected and active!")
+	}
+
 	port := ":8080"
 	server := &http.Server{
 		Addr:         port,
@@ -103,6 +112,9 @@ func main() {
 	<-quit
 
 	log.Println("🛑 [HydraStream] Shutting down Control Plane gracefully...")
+	if natsPub != nil {
+		natsPub.Close()
+	}
 	if mtxCmd != nil && mtxCmd.Process != nil {
 		log.Println("🛑 [HydraStream] Terminating embedded MediaMTX server...")
 		_ = mtxCmd.Process.Signal(syscall.SIGINT)
