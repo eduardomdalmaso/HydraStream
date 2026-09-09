@@ -42,5 +42,19 @@ module.exports = {
         PORT: "8082",
       },
     },
+
+    // 4. HydraVMS - Painel de Controle e Orquestrador Web (porta 5173)
+    {
+      name: "hydra-vms",
+      cwd: "/home/hades/Documents/HydraVMS/web",
+      script: "npm",
+      args: "run dev",
+      autorestart: true,
+      max_restarts: 10,
+      restart_delay: 2000,
+      env: {
+        PORT: "5173",
+      },
+    },
   ],
 };
