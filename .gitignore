@@ -28,6 +28,18 @@ build/
 # Shared Memory temporary files
 /dev/shm/hs_shm_*
 
+# Camera Snapshots & Media (Sensitive - NEVER COMMIT)
+samples/
+samples/*
+!samples/.gitkeep
+snapshots/
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.mp4
+*.mjpeg
+
 # Environment & Secrets
 .env
 .env.local
@@ -39,3 +51,4 @@ build/
 .idea/
 .vscode/
 .DS_Store
+
