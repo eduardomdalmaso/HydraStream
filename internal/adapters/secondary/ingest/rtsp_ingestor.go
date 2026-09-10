@@ -3,7 +3,10 @@ package ingest
 import (
 	"bufio"
 	"context"
+	"crypto/md5"
+	"encoding/base64"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -191,6 +194,17 @@ func (r *RTSPIngestor) connectAndDemuxRTSP(ctx context.Context, sess *ingestSess
 		host += ":554"
 	}
 
+	var username, password string
+	if u.User != nil {
+		username = u.User.Username()
+		password, _ = u.User.Password()
+	}
+
+	rawURI := fmt.Sprintf("rtsp://%s%s", u.Host, u.Path)
+	if rawURI == "" || rawURI == "rtsp://" {
+		rawURI = sess.sourceURL
+	}
+
 	d := net.Dialer{Timeout: 5 * time.Second}
 	conn, err := d.DialContext(ctx, "tcp", host)
 	if err != nil {
@@ -204,28 +218,56 @@ func (r *RTSPIngestor) connectAndDemuxRTSP(ctx context.Context, sess *ingestSess
 
 	br := bufio.NewReader(conn)
 	cseq := 1
+	var authHeader string
 
 	// 1. OPTIONS
-	if err := sendRTSPRequest(conn, "OPTIONS", sess.sourceURL, cseq, ""); err != nil {
+	if err := sendRTSPRequest(conn, "OPTIONS", rawURI, cseq, authHeader); err != nil {
 		return err
 	}
-	if _, err := readRTSPResponse(br); err != nil {
+	optResp, err := readRTSPResponse(br)
+	if err != nil {
 		return err
+	}
+	if strings.Contains(optResp, "401 Unauthorized") && username != "" {
+		wwwAuth := extractHeader(optResp, "WWW-Authenticate")
+		authHeader = buildAuthHeader(wwwAuth, "OPTIONS", rawURI, username, password)
+		cseq++
+		_ = sendRTSPRequest(conn, "OPTIONS", rawURI, cseq, authHeader)
+		_, _ = readRTSPResponse(br)
 	}
 	cseq++
 
 	// 2. DESCRIBE
-	if err := sendRTSPRequest(conn, "DESCRIBE", sess.sourceURL, cseq, "Accept: application/sdp\r\n"); err != nil {
+	if err := sendRTSPRequest(conn, "DESCRIBE", rawURI, cseq, "Accept: application/sdp\r\n"+authHeader); err != nil {
 		return err
 	}
-	if _, err := readRTSPResponse(br); err != nil {
+	descResp, err := readRTSPResponse(br)
+	if err != nil {
 		return err
+	}
+	if strings.Contains(descResp, "401 Unauthorized") {
+		if username == "" {
+			return fmt.Errorf("camera requires authentication (401 Unauthorized)")
+		}
+		wwwAuth := extractHeader(descResp, "WWW-Authenticate")
+		authHeader = buildAuthHeader(wwwAuth, "DESCRIBE", rawURI, username, password)
+		cseq++
+		if err := sendRTSPRequest(conn, "DESCRIBE", rawURI, cseq, "Accept: application/sdp\r\n"+authHeader); err != nil {
+			return err
+		}
+		descResp2, err := readRTSPResponse(br)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(descResp2, "401 Unauthorized") {
+			return fmt.Errorf("RTSP authentication failed (invalid user/password)")
+		}
 	}
 	cseq++
 
 	// 3. SETUP (Interleaved TCP channel 0-1)
-	setupURL := fmt.Sprintf("%s/trackID=0", strings.TrimSuffix(sess.sourceURL, "/"))
-	if err := sendRTSPRequest(conn, "SETUP", setupURL, cseq, "Transport: RTP/AVP/TCP;unicast;interleaved=0-1\r\n"); err != nil {
+	setupURL := fmt.Sprintf("%s/trackID=0", strings.TrimSuffix(rawURI, "/"))
+	if err := sendRTSPRequest(conn, "SETUP", setupURL, cseq, "Transport: RTP/AVP/TCP;unicast;interleaved=0-1\r\n"+authHeader); err != nil {
 		return err
 	}
 	setupResp, err := readRTSPResponse(br)
@@ -236,11 +278,11 @@ func (r *RTSPIngestor) connectAndDemuxRTSP(ctx context.Context, sess *ingestSess
 	cseq++
 
 	// 4. PLAY
-	var playHdr string
+	playExtra := authHeader
 	if sessionHdr != "" {
-		playHdr = fmt.Sprintf("Session: %s\r\n", sessionHdr)
+		playExtra = fmt.Sprintf("Session: %s\r\n%s", sessionHdr, authHeader)
 	}
-	if err := sendRTSPRequest(conn, "PLAY", sess.sourceURL, cseq, playHdr); err != nil {
+	if err := sendRTSPRequest(conn, "PLAY", rawURI, cseq, playExtra); err != nil {
 		return err
 	}
 	if _, err := readRTSPResponse(br); err != nil {
@@ -328,6 +370,52 @@ func extractHeader(resp, headerName string) string {
 			}
 			return val
 		}
+	}
+	return ""
+}
+
+func extractParam(header, param string) string {
+	for _, part := range strings.Split(header, ",") {
+		part = strings.TrimSpace(part)
+		if strings.HasPrefix(strings.ToLower(part), strings.ToLower(param)+"=") {
+			val := strings.TrimPrefix(part, part[:len(param)+1])
+			return strings.Trim(val, "\"")
+		}
+		// Also check first token if direct (e.g. Digest realm="...")
+		if strings.Contains(strings.ToLower(part), strings.ToLower(param)+"=") {
+			idx := strings.Index(strings.ToLower(part), strings.ToLower(param)+"=")
+			sub := part[idx+len(param)+1:]
+			if comma := strings.Index(sub, ","); comma != -1 {
+				sub = sub[:comma]
+			}
+			return strings.Trim(strings.TrimSpace(sub), "\"")
+		}
+	}
+	return ""
+}
+
+func md5Hex(s string) string {
+	h := md5.Sum([]byte(s))
+	return hex.EncodeToString(h[:])
+}
+
+func buildAuthHeader(challenge, method, uri, username, password string) string {
+	if username == "" {
+		return ""
+	}
+	if strings.Contains(strings.ToLower(challenge), "digest") {
+		realm := extractParam(challenge, "realm")
+		nonce := extractParam(challenge, "nonce")
+		if realm != "" && nonce != "" {
+			ha1 := md5Hex(fmt.Sprintf("%s:%s:%s", username, realm, password))
+			ha2 := md5Hex(fmt.Sprintf("%s:%s", method, uri))
+			response := md5Hex(fmt.Sprintf("%s:%s:%s", ha1, nonce, ha2))
+			return fmt.Sprintf("Authorization: Digest username=\"%s\", realm=\"%s\", nonce=\"%s\", uri=\"%s\", response=\"%s\"\r\n", username, realm, nonce, uri, response)
+		}
+	}
+	if strings.Contains(strings.ToLower(challenge), "basic") {
+		cred := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
+		return fmt.Sprintf("Authorization: Basic %s\r\n", cred)
 	}
 	return ""
 }
