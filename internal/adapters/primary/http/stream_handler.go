@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -88,8 +89,8 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 
 	streamID := parts[0]
 
-	// Route: GET /api/v1/streams/{id}/snapshot.jpg
-	if len(parts) >= 2 && parts[1] == "snapshot.jpg" {
+	// Route: GET /api/v1/streams/{id}/snapshot or snapshot.jpg
+	if len(parts) >= 2 && (parts[1] == "snapshot" || parts[1] == "snapshot.jpg") {
 		h.handleSnapshot(w, r, streamID)
 		return
 	}
@@ -191,65 +192,103 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, _ *http.Request, streamI
 		return
 	}
 
-	// 2. Tentar ler frame padrão cam_entrance_01.jpg
-	if data, err := os.ReadFile("samples/cam_entrance_01.jpg"); err == nil && len(data) > 0 {
+	// 2. Capturar frame sob demanda do MediaMTX
+	snapCmd := exec.Command("ffmpeg", "-rtsp_transport", "tcp", "-timeout", "3000000",
+		"-i", fmt.Sprintf("rtsp://localhost:8554/%s_sub", streamID),
+		"-frames:v", "1", "-q:v", "2", "-y", samplePath)
+	if err := snapCmd.Run(); err == nil {
+		if data, err := os.ReadFile(samplePath); err == nil && len(data) > 0 {
+			_, _ = w.Write(data)
+			return
+		}
+	}
+
+	// 3. Fallback para cam_10_0_0_64.jpg se existir
+	if data, err := os.ReadFile("samples/cam_10_0_0_64.jpg"); err == nil && len(data) > 0 {
 		_, _ = w.Write(data)
 		return
 	}
-
-	// 3. Fallback estático de emergência
-	jpegBytes := []byte{
-		0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
-		0x01, 0x01, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43,
-		0x00, 0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08, 0x07, 0x07, 0x07, 0x09,
-		0x09, 0x08, 0x0A, 0x0C, 0x14, 0x0D, 0x0C, 0x0B, 0x0B, 0x0C, 0x19, 0x12,
-		0x13, 0x0F, 0x14, 0x1D, 0x1A, 0x1F, 0x1E, 0x1D, 0x1A, 0x1C, 0x1C, 0x20,
-		0x24, 0x2E, 0x27, 0x20, 0x22, 0x2C, 0x23, 0x1C, 0x1C, 0x28, 0x37, 0x29,
-		0x2C, 0x30, 0x31, 0x34, 0x34, 0x34, 0x1F, 0x27, 0x39, 0x3D, 0x38, 0x32,
-		0x3C, 0x2E, 0x33, 0x34, 0x32, 0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x00, 0x01,
-		0x00, 0x01, 0x01, 0x01, 0x11, 0x00, 0xFF, 0xC4, 0x00, 0x1F, 0x00, 0x00,
-		0x01, 0x05, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-		0x09, 0x0A, 0x0B, 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F,
-		0x00, 0x7F, 0x00, 0x3A, 0xFE, 0x8A, 0x28, 0xA0, 0x00, 0xFF, 0xD9,
-	}
-	w.Write(jpegBytes)
 }
 
 func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, streamID string) {
-	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=ffmpeg")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
-		return
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
 	}
 
-	samplePath := filepath.Join("samples", fmt.Sprintf("%s.jpg", streamID))
-	fallbackPath := "samples/cam_entrance_01.jpg"
-
-	ticker := time.NewTicker(40 * time.Millisecond)
-	defer ticker.Stop()
+	// 1. Primary source: MediaMTX Data Plane Relay on localhost:8554
+	targetURL := fmt.Sprintf("rtsp://localhost:8554/%s_sub", streamID)
+	if r.URL.Query().Get("main") == "1" {
+		targetURL = fmt.Sprintf("rtsp://localhost:8554/%s", streamID)
+	}
 
 	for {
 		select {
 		case <-r.Context().Done():
 			return
-		case <-ticker.C:
+		default:
+		}
+
+		args := []string{
+			"-loglevel", "error",
+			"-fflags", "nobuffer",
+			"-flags", "low_delay",
+			"-fflags", "+discardcorrupt",
+			"-rtsp_transport", "tcp",
+			"-timeout", "5000000",
+			"-i", targetURL,
+			"-an",
+			"-threads", "2",
+			"-c:v", "mjpeg",
+			"-q:v", "5",
+			"-r", "20",
+			"-f", "mpjpeg",
+			"-boundary_tag", "ffmpeg",
+			"-",
+		}
+
+		cmd := exec.CommandContext(r.Context(), "ffmpeg", args...)
+		cmd.Stdout = w
+		cmd.Stderr = os.Stderr
+
+		if err := cmd.Run(); err != nil {
+			if r.Context().Err() != nil {
+				return
+			}
+			// 2. Direct Camera fallback if registered in stream repository
+			st, findErr := h.useCase.GetStream(r.Context(), streamID)
+			if findErr == nil && st != nil && st.SourceURL != "" && !strings.HasPrefix(st.SourceURL, "synthetic://") {
+				directURL := st.SourceURL
+				if strings.Contains(directURL, "/stream1") && r.URL.Query().Get("main") != "1" {
+					directURL = strings.Replace(directURL, "/stream1", "/stream2", 1)
+				}
+				args[7] = directURL
+				directCmd := exec.CommandContext(r.Context(), "ffmpeg", args...)
+				directCmd.Stdout = w
+				_ = directCmd.Run()
+				if r.Context().Err() != nil {
+					return
+				}
+			}
+			// 3. Fallback to sample ticker if media relay and direct are offline
+			samplePath := filepath.Join("samples", fmt.Sprintf("%s.jpg", streamID))
+			fallbackPath := "samples/cam_entrance_01.jpg"
 			data, err := os.ReadFile(samplePath)
 			if err != nil || len(data) == 0 {
 				data, _ = os.ReadFile(fallbackPath)
 			}
 			if len(data) > 0 {
-				fmt.Fprintf(w, "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", len(data))
+				fmt.Fprintf(w, "--ffmpeg\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", len(data))
 				w.Write(data)
 				w.Write([]byte("\r\n"))
-				flusher.Flush()
 			}
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 }

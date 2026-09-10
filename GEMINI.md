@@ -4,6 +4,17 @@ Este documento define a arquitetura, design system, catálogo de skills, pipelin
 
 ---
 
+## 0. Arquitetura Split-Plane & Limites Invioláveis do Ecossistema
+
+O ecossistema Hydra opera em 4 planos com responsabilidades atômicas:
+
+1. **Data Plane / Motor de Mídia (HydraStream :8080 & MediaMTX :8554/:8889):** Exclusivo para descoberta ONVIF WS-Discovery, probing, ingestão RTSP TCP RFC 2326, snapshots e streaming WebRTC WHEP/HLS, além de buffer Zero-Copy `/dev/shm` e CUDA IPC na RTX 5090.
+2. **Control Plane (HydraVMS :8083):** Exclusivo para PostgreSQL (câmeras, pastas, usuários, RBAC, layouts, perfis de gravação e workflows). **PROIBIDO** conter processamento de vídeo ou FFmpeg.
+3. **Analytics Plane (HydraForge :8081):** Treinamento YOLO, autotuning e compilação TensorRT na RTX 5090.
+4. **Curation Plane (HydraVault :8082):** Curadoria e auto-rotulagem de datasets com SAM 2.
+
+---
+
 ## 1. Filosofia de Engenharia e Estrutura Arquitetural
 
 O projeto segue estritamente a **Arquitetura Hexagonal (Ports & Adapters)** combinada com **Domain-Driven Design (DDD)**:
