@@ -88,6 +88,7 @@ func main() {
 		log.Printf("⚠️ [HydraStream] NATS Event Mesh not reachable: %v (continuing standalone mode)\n", err)
 	} else {
 		log.Println("✅ [HydraStream] NATS Event Mesh connected and active!")
+		rtspIngestor.SetPublisher(natsPub)
 	}
 
 	port := ":8080"

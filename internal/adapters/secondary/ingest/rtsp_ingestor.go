@@ -35,10 +35,17 @@ type ingestSession struct {
 	err           error
 }
 
+// StreamEventPublisher defines the callback to publish CloudEvents to NATS.
+type StreamEventPublisher interface {
+	PublishCameraOffline(ctx context.Context, tenantID, streamID, errorMsg string) error
+	PublishCameraOnline(ctx context.Context, tenantID, streamID string) error
+}
+
 // RTSPIngestor manages concurrent RTSP stream ingestion sessions.
 type RTSPIngestor struct {
-	mu       sync.RWMutex
-	sessions map[string]*ingestSession
+	mu        sync.RWMutex
+	sessions  map[string]*ingestSession
+	publisher StreamEventPublisher
 }
 
 // NewRTSPIngestor creates a new RTSPIngestor adapter.
@@ -46,6 +53,13 @@ func NewRTSPIngestor() *RTSPIngestor {
 	return &RTSPIngestor{
 		sessions: make(map[string]*ingestSession),
 	}
+}
+
+// SetPublisher configures the event publisher for instant status emission.
+func (r *RTSPIngestor) SetPublisher(pub StreamEventPublisher) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.publisher = pub
 }
 
 // StartIngest starts a background worker ingesting from the stream's source URL.
@@ -167,8 +181,14 @@ func (r *RTSPIngestor) runWorker(ctx context.Context, sess *ingestSession, strea
 				sess.mu.Unlock()
 
 				if !loggedErr {
-					log.Printf("[HydraStream RTSP] Stream '%s' (%s) offline: %v. Running in local simulation mode while probing for live feed...", sess.streamID, sess.sourceURL, err)
+					log.Printf("[HydraStream RTSP] Stream '%s' (%s) offline: %v.", sess.streamID, sess.sourceURL, err)
 					loggedErr = true
+					r.mu.RLock()
+					pub := r.publisher
+					r.mu.RUnlock()
+					if pub != nil {
+						_ = pub.PublishCameraOffline(ctx, stream.TenantID, sess.streamID, err.Error())
+					}
 				}
 
 				// Pump synthetic test frames while offline so downstream analytics & HUD have live data
@@ -294,6 +314,13 @@ func (r *RTSPIngestor) connectAndDemuxRTSP(ctx context.Context, sess *ingestSess
 	sess.err = nil
 	sess.mu.Unlock()
 	log.Printf("[HydraStream RTSP] Stream '%s' established active TCP session with %s.", sess.streamID, host)
+
+	r.mu.RLock()
+	pub := r.publisher
+	r.mu.RUnlock()
+	if pub != nil {
+		_ = pub.PublishCameraOnline(ctx, "", sess.streamID)
+	}
 
 	// Demux Interleaved RTP packets ($ + channel + len + payload)
 	buf := make([]byte, 65536)
