@@ -181,26 +181,36 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) handleSnapshot(w http.ResponseWriter, _ *http.Request, streamID string) {
+func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamID string) {
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 
-	// 1. Tentar ler frame real do stream em samples/<stream_id>.jpg
 	samplePath := filepath.Join("samples", fmt.Sprintf("%s.jpg", streamID))
-	if data, err := os.ReadFile(samplePath); err == nil && len(data) > 0 {
-		_, _ = w.Write(data)
-		return
-	}
+	isRefresh := r != nil && (r.URL.Query().Get("refresh") == "true" || r.URL.Query().Get("force") == "true")
 
-	// 2. Capturar frame sob demanda do MediaMTX
-	snapCmd := exec.Command("ffmpeg", "-rtsp_transport", "tcp", "-timeout", "3000000",
-		"-i", fmt.Sprintf("rtsp://localhost:8554/%s_sub", streamID),
-		"-frames:v", "1", "-q:v", "2", "-y", samplePath)
-	if err := snapCmd.Run(); err == nil {
+	// 1. Tentar ler frame cacheado caso não tenha sido solicitado refresh
+	if !isRefresh {
 		if data, err := os.ReadFile(samplePath); err == nil && len(data) > 0 {
 			_, _ = w.Write(data)
 			return
 		}
+	}
+
+	// 2. Capturar frame sob demanda do MediaMTX (sub-stream ou main stream)
+	snapCmd := exec.Command("ffmpeg", "-rtsp_transport", "tcp", "-timeout", "3000000",
+		"-i", fmt.Sprintf("rtsp://localhost:8554/%s_sub", streamID),
+		"-frames:v", "1", "-q:v", "2", "-y", samplePath)
+	if err := snapCmd.Run(); err != nil {
+		snapCmd = exec.Command("ffmpeg", "-rtsp_transport", "tcp", "-timeout", "3000000",
+			"-i", fmt.Sprintf("rtsp://localhost:8554/%s", streamID),
+			"-frames:v", "1", "-q:v", "2", "-y", samplePath)
+		_ = snapCmd.Run()
+	}
+
+	if data, err := os.ReadFile(samplePath); err == nil && len(data) > 0 {
+		_, _ = w.Write(data)
+		return
 	}
 
 	// 3. Fallback para cam_10_0_0_64.jpg se existir

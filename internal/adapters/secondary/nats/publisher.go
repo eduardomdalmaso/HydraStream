@@ -72,6 +72,27 @@ func (p *StreamNATSPublisher) PublishStreamStatus(ctx context.Context, tenantID,
 	return p.nc.Publish(subject, payload)
 }
 
+// PublishRecordingSegment publishes a completed recording segment to NATS JetStream.
+func (p *StreamNATSPublisher) PublishRecordingSegment(ctx context.Context, tenantID, cameraID, recordingMode, s3Key string, startTime, endTime time.Time, durationSec int, fileSizeBytes int64) error {
+	subject := fmt.Sprintf("hydra.v1.%s.cameras.%s.recordings.segment", tenantID, cameraID)
+
+	payload, err := json.Marshal(map[string]interface{}{
+		"tenant_id":        tenantID,
+		"camera_id":        cameraID,
+		"recording_mode":   recordingMode,
+		"s3_key":           s3Key,
+		"start_time":       startTime.Format(time.RFC3339),
+		"end_time":         endTime.Format(time.RFC3339),
+		"duration_seconds": durationSec,
+		"file_size_bytes":  fileSizeBytes,
+	})
+	if err != nil {
+		return err
+	}
+
+	return p.nc.Publish(subject, payload)
+}
+
 // Close gracefully closes the NATS connection.
 func (p *StreamNATSPublisher) Close() {
 	if p.nc != nil {
