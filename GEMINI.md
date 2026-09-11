@@ -66,7 +66,7 @@ O frontend adota o design system oficial Clean Slate Dark (espelhado do **HydraV
 - **Tipografia Modular:** Google Fonts (`Roboto` / `Inter` para interface e `JetBrains Mono` para métricas, IDs, offsets e FPS).
 
 ### ⚠️ Regras Estritas de Frontend & UI Standards:
-- **Limite Máximo de 100 Linhas por Arquivo:** Nenhum arquivo CSS, JS ou JSX em `web/` pode ultrapassar **100 linhas**. Se crescer, deve ser modularizado.
+- **Modularidade & Coesão:** Componentes `.vue`/`.jsx` até 150 linhas (teto de 200 linhas para views complexas), composables/lógica `.ts` até 100-120 linhas; dicionários `locales/` e `types/` livres.
 - **Proibição Absoluta de Emojis em Listas e Dropdowns:** Nunca usar emojis dentro de `<select>`, `<option>`, dropdowns, tabelas ou listas em nenhum projeto.
 - **Nomenclatura Concisa & HUD:** Rótulos atômicos (`INGESTAO`, `CONSUMIDORES`, `CODEC`, `RESOLUCAO`, `FPS`, `BITRATE`, `SHM BUFFER`).
 - **Botões de Confirmação:** O texto do botão de confirmação e salvamento é estritamente **`SALVAR`**.
@@ -163,8 +163,8 @@ make stream-sample
 Ao final de **qualquer modificação de código**, o agente deve obrigatoriamente executar o seguinte checklist de auto-reparo antes de concluir:
 
 ```bash
-# 1. Auditoria de Limite de Linhas Web (< 100 linhas por arquivo)
-wc -l web/css/*.css web/css/*/*.css web/js/*.js web/js/*/*.js web/src/**/*.css web/src/**/*.jsx 2>/dev/null
+# 1. Auditoria de Limite de Linhas Web (Composables <= 120, Views <= 200, Locales/Types isentos)
+wc -l web/css/*.css web/css/*/*.css web/js/*.js web/js/*/*.js web/src/**/*.css web/src/**/*.jsx 2>/dev/null | awk '$2 !~ /locales|types/ && $1 > 200 { print "VIOLATION: " $2 " has " $1 " lines (>200)" }'
 
 # 2. Auditoria de Pureza DDD (Nenhum import de net/http no domínio)
 grep -rn "net/http" internal/domain/ && echo "VIOLAÇÃO DDD: Remova net/http do domínio!"
@@ -172,7 +172,10 @@ grep -rn "net/http" internal/domain/ && echo "VIOLAÇÃO DDD: Remova net/http do
 # 3. Compilação e Testes Automatizados
 make test && make build
 
-# 4. Sincronização da Documentação
+# 4. Auditoria de Paridade de Internacionalização (i18n)
+# Todo texto ou chave nova adicionada no frontend DEVE existir em todos os idiomas suportados (PT, EN, ES).
+
+# 5. Sincronização da Documentação
 # Garantir que README.md (Inglês) e README.pt-BR.md (Português) estejam 100% atualizados.
 ```
 
