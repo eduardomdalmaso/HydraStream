@@ -9,11 +9,81 @@ import (
 const OpenAPI3Spec = `{
   "openapi": "3.0.3",
   "info": {
-    "title": "HydraStream Control Plane API",
-    "description": "High-Performance Video Analytics Stream Management REST API",
+    "title": "HydraStream Data Plane & Telemetry API",
+    "description": "High-Performance Video Ingest, RFC 2326 TCP Demuxing, Zero-Copy SHM and Real-Time Telemetry API",
     "version": "1.0.0"
   },
   "paths": {
+    "/api/v1/health": {
+      "get": {
+        "summary": "Detailed System Health & Service Readiness",
+        "description": "Returns overall health status, subsystem readiness (RTSP, MediaMTX, SHM, NATS, GPU), active stream counters and anomaly counts.",
+        "responses": {
+          "200": { "description": "System is healthy or degraded" },
+          "503": { "description": "System is unhealthy" }
+        }
+      }
+    },
+    "/api/v1/telemetry": {
+      "get": {
+        "summary": "Unified Observability & Telemetry",
+        "description": "Returns combined health indicators, hardware metrics, and error summaries in a single response.",
+        "responses": { "200": { "description": "Unified telemetry payload" } }
+      }
+    },
+    "/api/v1/telemetry/hardware": {
+      "get": {
+        "summary": "Detailed Hardware Consumption Telemetry",
+        "description": "Returns host CPU cores/goroutines, Go memory & host RAM, NVIDIA RTX GPU VRAM/utilization/temp/power, and /dev/shm ring buffer occupancy.",
+        "responses": { "200": { "description": "Hardware telemetry payload" } }
+      }
+    },
+    "/api/v1/telemetry/logs": {
+      "get": {
+        "summary": "Query In-Memory Ring Buffer Telemetry Logs",
+        "parameters": [
+          { "name": "level", "in": "query", "schema": { "type": "string", "enum": ["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"] } },
+          { "name": "component", "in": "query", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } },
+          { "name": "since", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": { "200": { "description": "Filtered log entries" } }
+      },
+      "post": {
+        "summary": "Ingest Custom Diagnostic Log Entry",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["message"],
+                "properties": {
+                  "level": { "type": "string", "default": "INFO" },
+                  "component": { "type": "string", "default": "custom" },
+                  "message": { "type": "string" },
+                  "details": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Log entry recorded" } }
+      }
+    },
+    "/api/v1/telemetry/errors": {
+      "get": {
+        "summary": "Aggregated Error & Anomaly Telemetry",
+        "description": "Returns error breakdown by component, recent error traces, and frequency statistics.",
+        "responses": { "200": { "description": "Error summary payload" } }
+      }
+    },
+    "/api/v1/telemetry/stats": {
+      "get": {
+        "summary": "Control Panel Live Stream Telemetry",
+        "responses": { "200": { "description": "Control panel telemetry" } }
+      }
+    },
     "/api/v1/streams": {
       "get": {
         "summary": "List active video streams",
@@ -68,36 +138,6 @@ const OpenAPI3Spec = `{
         "responses": { "200": { "description": "Live ingestion stats" } }
       }
     },
-    "/api/v1/streams/{id}/consumers/{analytic_type}": {
-      "patch": {
-        "summary": "Update consumer sampling FPS or output format",
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
-          { "name": "analytic_type", "in": "path", "required": true, "schema": { "type": "string" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "target_fps": { "type": "number" },
-                  "output_format": { "type": "string" }
-                }
-              }
-            }
-          }
-        },
-        "responses": { "200": { "description": "Consumer updated" } }
-      }
-    },
-    "/api/v1/telemetry/stats": {
-      "get": {
-        "summary": "Get real-time dashboard telemetry and charts history",
-        "responses": { "200": { "description": "Control panel telemetry" } }
-      }
-    },
     "/api/v1/info": {
       "get": {
         "summary": "System and GPU Hardware Readout",
@@ -110,36 +150,11 @@ const OpenAPI3Spec = `{
         "responses": { "200": { "description": "Cluster topology" } }
       }
     },
-    "/api/v1/chaos/inject": {
-      "post": {
-        "summary": "Inject real fault/chaos experiment into stream pipeline",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["experiment_type"],
-                "properties": {
-                  "experiment_type": { "type": "string", "enum": ["packet_drop", "disconnect", "gpu_stall", "shm_overflow"] },
-                  "intensity": { "type": "number", "default": 25 },
-                  "stream_id": { "type": "string", "default": "cam_entrance_01" }
-                }
-              }
-            }
-          }
-        },
-        "responses": { "200": { "description": "Chaos experiment outcome and recovery metrics" } }
-      }
-    },
-    "/api/v1/chaos/reset": {
-      "post": {
-        "summary": "Disarm all chaos injection circuits",
-        "responses": { "200": { "description": "Circuits reset" } }
-      }
-    },
     "/healthz": {
       "get": { "summary": "Liveness probe", "responses": { "200": { "description": "OK" } } }
+    },
+    "/readyz": {
+      "get": { "summary": "Readiness probe", "responses": { "200": { "description": "READY" } } }
     },
     "/metrics": {
       "get": { "summary": "Prometheus Metrics", "responses": { "200": { "description": "Prometheus text format" } } }

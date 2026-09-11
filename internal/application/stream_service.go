@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"hydrastream/internal/adapters/secondary/gpu"
+	"hydrastream/internal/adapters/secondary/logger"
 	"hydrastream/internal/domain"
 	"hydrastream/internal/ports"
 )
@@ -21,6 +22,8 @@ type StreamService struct {
 	repo       ports.StreamRepository
 	ingestor   ports.StreamIngestor
 	onvif      ports.ONVIFDiscoverer
+	logCol     ports.LogCollector
+	startTime  time.Time
 	mu         sync.Mutex
 	history    []float64
 	latHistory []float64
@@ -28,16 +31,20 @@ type StreamService struct {
 }
 
 // NewStreamService creates a new StreamService application instance.
-func NewStreamService(repo ports.StreamRepository, ingestor ports.StreamIngestor, onvif ...ports.ONVIFDiscoverer) *StreamService {
-	var onvifDisc ports.ONVIFDiscoverer
-	if len(onvif) > 0 {
-		onvifDisc = onvif[0]
+func NewStreamService(repo ports.StreamRepository, ingestor ports.StreamIngestor, onvif ports.ONVIFDiscoverer, logCollector ...ports.LogCollector) *StreamService {
+	var logCol ports.LogCollector
+	if len(logCollector) > 0 && logCollector[0] != nil {
+		logCol = logCollector[0]
+	} else {
+		logCol = logger.NewRingLogger(1000)
 	}
 
 	s := &StreamService{
 		repo:       repo,
 		ingestor:   ingestor,
-		onvif:      onvifDisc,
+		onvif:      onvif,
+		logCol:     logCol,
+		startTime:  time.Now().UTC(),
 		history:    []float64{38.2, 44.5, 52.1, 48.0, 62.4, 58.9, 61.2},
 		latHistory: []float64{1.2, 1.4, 1.35, 1.42, 1.48, 1.39, 1.42},
 		lastTick:   time.Now(),
@@ -56,14 +63,20 @@ func NewStreamService(repo ports.StreamRepository, ingestor ports.StreamIngestor
 
 func (s *StreamService) RegisterStream(ctx context.Context, stream *domain.Stream) error {
 	if err := stream.Validate(); err != nil {
+		s.RecordLog(domain.LogLevelWarn, "validation", fmt.Sprintf("Stream validation failed: %v", err), nil)
 		return err
 	}
 	if err := s.repo.Save(ctx, stream); err != nil {
+		s.RecordLog(domain.LogLevelError, "storage", fmt.Sprintf("Failed to save stream '%s': %v", stream.StreamID, err), nil)
 		return err
 	}
 	if s.ingestor != nil {
-		return s.ingestor.StartIngest(ctx, stream)
+		if err := s.ingestor.StartIngest(ctx, stream); err != nil {
+			s.RecordLog(domain.LogLevelError, "ingest", fmt.Sprintf("Failed to start ingest for stream '%s': %v", stream.StreamID, err), nil)
+			return err
+		}
 	}
+	s.RecordLog(domain.LogLevelInfo, "stream", fmt.Sprintf("Stream '%s' registered successfully (Codec: %s, Ingest FPS: %.1f)", stream.StreamID, stream.Codec, stream.IngestFPS), nil)
 	return nil
 }
 
@@ -85,6 +98,7 @@ func (s *StreamService) DeleteStream(ctx context.Context, streamID string) error
 	if s.ingestor != nil {
 		_ = s.ingestor.StopIngest(ctx, streamID)
 	}
+	s.RecordLog(domain.LogLevelInfo, "stream", fmt.Sprintf("Stream '%s' unregistered and ingest stopped", streamID), nil)
 	return s.repo.Delete(ctx, streamID)
 }
 
@@ -99,6 +113,7 @@ func (s *StreamService) UpdateConsumer(ctx context.Context, streamID, analyticTy
 	if streamID == "" || analyticType == "" {
 		return domain.ErrInvalidStream
 	}
+	s.RecordLog(domain.LogLevelInfo, "consumer", fmt.Sprintf("Updated consumer '%s' on stream '%s' (Target FPS: %.1f, Format: %s)", analyticType, streamID, targetFPS, format), nil)
 	return s.repo.UpdateConsumerFPS(ctx, streamID, analyticType, targetFPS, format)
 }
 
@@ -131,7 +146,6 @@ func (s *StreamService) GetClusterTopology(ctx context.Context, streamID string)
 
 	hw := gpu.DetectHardware()
 
-	// Real Local Host Node
 	localNode := domain.ClusterNode{
 		NodeName:      fmt.Sprintf("%s (Local Machine)", hostname),
 		NodeIP:        localIP,
@@ -187,6 +201,126 @@ func (s *StreamService) GetSystemInfo(ctx context.Context) (*domain.SystemInfo, 
 		},
 	}
 	return info, nil
+}
+
+// GetHealth returns high-level system readiness and health indicators.
+func (s *StreamService) GetHealth(ctx context.Context) (*domain.SystemHealth, error) {
+	streams, total, _ := s.repo.ListFiltered(ctx, "", "", "", 1, 500)
+	uptime := s.repo.UptimeSeconds(ctx)
+
+	onlineCount := 0
+	offlineCount := 0
+	totalConsumers := 0
+	var totalFPS float64
+	var totalBandwidth float64
+
+	for _, st := range streams {
+		if st.Status == "online" || st.Status == "ONLINE" {
+			onlineCount++
+		} else {
+			offlineCount++
+		}
+		totalConsumers += len(st.Consumers)
+		totalFPS += st.IngestFPS
+		totalBandwidth += st.NetworkKbps
+	}
+
+	hw := gpu.DetectHardware()
+	gpuStatus := "CPU_FALLBACK (No GPU)"
+	if hw.Detected {
+		gpuStatus = fmt.Sprintf("ONLINE (%s)", hw.Model)
+	}
+
+	errSummary, _ := s.GetErrorSummary(ctx)
+	totalErrs := 0
+	totalWarns := 0
+	if errSummary != nil {
+		totalErrs = errSummary.TotalErrors
+		totalWarns = errSummary.TotalWarnings
+	}
+
+	status := "healthy"
+	if totalErrs > 20 || offlineCount > 0 {
+		status = "degraded"
+	}
+
+	return &domain.SystemHealth{
+		Status:        status,
+		Service:       "hydrastream-dataplane",
+		Version:       "1.0.0",
+		UptimeSeconds: uptime,
+		StartedAt:     s.startTime,
+		Services: domain.ServiceStatus{
+			RTSPIngestor:    "ONLINE",
+			MediaMTXRelay:   "ONLINE",
+			POSIXSHMBuffers: "ONLINE",
+			NATSEventMesh:   "ONLINE",
+			GPUAcceleration: gpuStatus,
+		},
+		Streams: domain.StreamsSummary{
+			TotalStreams:    total,
+			OnlineStreams:   onlineCount,
+			OfflineStreams:  offlineCount,
+			TotalConsumers:  totalConsumers,
+			TotalIngestFPS:  totalFPS,
+			PeakBandwidthMb: totalBandwidth / 1000.0,
+		},
+		ErrorCount:   totalErrs,
+		WarningCount: totalWarns,
+		Timestamp:    time.Now().UTC(),
+	}, nil
+}
+
+// GetHardwareTelemetry queries detailed Host CPU, RAM, GPU VRAM and POSIX /dev/shm stats.
+func (s *StreamService) GetHardwareTelemetry(ctx context.Context) (*domain.HardwareTelemetry, error) {
+	hw := gpu.GetCompleteHardwareTelemetry()
+	return &hw, nil
+}
+
+// GetUnifiedTelemetry aggregates health, hardware and error telemetry in a single payload.
+func (s *StreamService) GetUnifiedTelemetry(ctx context.Context) (*domain.UnifiedTelemetry, error) {
+	health, err := s.GetHealth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	hw, err := s.GetHardwareTelemetry(ctx)
+	if err != nil {
+		return nil, err
+	}
+	errs, err := s.GetErrorSummary(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.UnifiedTelemetry{
+		Health:    *health,
+		Hardware:  *hw,
+		Errors:    *errs,
+		Timestamp: time.Now().UTC(),
+	}, nil
+}
+
+// GetLogs returns filtered logs from the in-memory ring buffer.
+func (s *StreamService) GetLogs(ctx context.Context, filter domain.LogFilter) (*domain.LogQueryResult, error) {
+	if s.logCol == nil {
+		return &domain.LogQueryResult{}, nil
+	}
+	return s.logCol.QueryLogs(ctx, filter)
+}
+
+// GetErrorSummary returns aggregate errors from the in-memory ring buffer.
+func (s *StreamService) GetErrorSummary(ctx context.Context) (*domain.ErrorSummary, error) {
+	if s.logCol == nil {
+		return &domain.ErrorSummary{ErrorsByComponent: make(map[string]int)}, nil
+	}
+	return s.logCol.GetErrorSummary(ctx)
+}
+
+// RecordLog records an event into the ring-buffer logger.
+func (s *StreamService) RecordLog(level domain.LogLevel, component, message string, details map[string]interface{}) {
+	if s.logCol != nil {
+		s.logCol.RecordLog(level, component, message, details)
+	}
 }
 
 func (s *StreamService) GetControlPanelTelemetry(ctx context.Context) (*domain.ControlPanelTelemetry, error) {
@@ -339,7 +473,6 @@ func (s *StreamService) ResetChaos(ctx context.Context) error {
 	return nil
 }
 
-// DiscoverONVIFDevices scans the local network using WS-Discovery.
 func (s *StreamService) DiscoverONVIFDevices(ctx context.Context) ([]domain.ONVIFDevice, error) {
 	if s.onvif == nil {
 		return nil, fmt.Errorf("onvif discovery adapter not configured")
@@ -347,7 +480,6 @@ func (s *StreamService) DiscoverONVIFDevices(ctx context.Context) ([]domain.ONVI
 	return s.onvif.Discover(ctx, 3*time.Second)
 }
 
-// ProbeONVIFDevice connects to a specific ONVIF camera IP and extracts profiles and RTSP URI.
 func (s *StreamService) ProbeONVIFDevice(ctx context.Context, req domain.ONVIFProbeRequest) (*domain.ONVIFDevice, error) {
 	if s.onvif == nil {
 		return nil, fmt.Errorf("onvif discovery adapter not configured")

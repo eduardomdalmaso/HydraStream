@@ -137,10 +137,11 @@ HydraStream/
 │   ├── ports/              # Interfaces da Arquitetura Hexagonal (UseCases, Ingestor, Repo)
 │   ├── application/        # Serviços de Aplicação & telemetria dinâmica
 │   └── adapters/
-│       ├── primary/http/   # Handlers HTTP, Router e Docs OpenAPI Swagger
+│       ├── primary/http/   # Handlers HTTP, Telemetria, Logs e Docs OpenAPI Swagger
 │       └── secondary/
 │           ├── ingest/     # Demuxer nativo RFC 2326 RTSP / TCP / RTP
 │           ├── gpu/        # Detector de GPU NVIDIA em tempo real (RTX 5090/4090)
+│           ├── logger/     # In-memory thread-safe Ring Buffer log collector
 │           ├── memory/     # Repositório de streams em memória Thread-Safe
 │           └── shm/        # Adaptador Go para inspeção de POSIX SHM
 ├── sdk/
@@ -148,21 +149,34 @@ HydraStream/
 ├── examples/
 │   └── python_consumer.py  # Exemplo de consumo zero-copy com OpenCV e YOLO
 ├── bin/                    # Binários compilados e servidor MediaMTX local
-├── web/                    # Dashboard Web UI (HTML/CSS/JS < 100 linhas/arquivo)
 ├── Makefile                # Automação de compilação, testes, benchmark e MediaMTX
 └── README.pt-BR.md
 ```
 
 ---
 
+## Endpoints de Telemetria e Saúde (Observabilidade em Tempo Real)
+
+| Endpoint | Método | Descrição |
+| :--- | :---: | :--- |
+| `GET /api/v1/health` | `GET` | Diagnóstico completo de integridade e prontidão dos subsistemas (RTSP, MediaMTX, SHM, NATS, GPU). |
+| `GET /api/v1/telemetry` | `GET` | Payload unificado contendo saúde, métricas de hardware e sumário de erros. |
+| `GET /api/v1/telemetry/hardware` | `GET` | Consumo em tempo real de CPU (núcleos/goroutines), RAM do Host/Go, VRAM/GPU Util/Temp (RTX 5090) e `/dev/shm`. |
+| `GET /api/v1/telemetry/logs` | `GET` | Consulta ao Ring Buffer de logs em memória com filtros (`level`, `component`, `limit`, `since`). |
+| `POST /api/v1/telemetry/logs` | `POST` | Ingestão manual de eventos diagnósticos. |
+| `GET /api/v1/telemetry/errors` | `GET` | Agregação de anomalias, contagem de erros por componente e histórico recente. |
+| `GET /healthz` & `/readyz` | `GET` | Probes padrão de liveness e readiness (HTTP 200 OK). |
+| `GET /swagger/` | `GET` | Documentação OpenAPI / Swagger UI interativa. |
+
+---
+
 ## Guia de Início Rápido
 
-### 1. Iniciar o HydraStream em Modo Dev
+### 1. Iniciar o HydraStream
 ```bash
 make dev
 ```
-> Inicia o Control Plane em Go e a Web UI em **`http://localhost:8080`**.
-> Qualquer alteração no frontend em `web/` é refletida instantaneamente ao atualizar a página (**F5**)!
+> Inicia o Data Plane Engine em Go com endpoints REST e Telemetria em **`http://localhost:8080`**.
 
 ### 2. Iniciar o Servidor MediaMTX Local (Binário Incluído)
 ```bash

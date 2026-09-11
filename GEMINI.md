@@ -20,24 +20,25 @@ O ecossistema Hydra opera em 4 planos com responsabilidades atômicas:
 O projeto segue estritamente a **Arquitetura Hexagonal (Ports & Adapters)** combinada com **Domain-Driven Design (DDD)**:
 
 ```text
-hydrastream / hydraforge
+hydrastream
 ├── cmd/                          # Entrypoints principais dos binários
 ├── internal/
 │   ├── domain/                   # Entidades puras e regras de negócio (ZERO imports de infra/HTTP)
 │   ├── ports/                    # Interfaces de entrada (Driving) e saída (Driven)
 │   ├── application/              # Casos de uso e orquestração de serviços
 │   └── adapters/
-│       ├── primary/http/         # Controladores REST, gRPC e WebSockets
+│       ├── primary/http/         # Controladores REST, Telemetria e WebSockets
 │       └── secondary/
 │           ├── ingest/           # Adaptador RFC 2326 RTSP / TCP RTP
 │           ├── gpu/              # Detector de hardware GPU (NVIDIA RTX 5090 / CUDA 13.3)
+│           ├── logger/           # Ring Buffer em memória para logs e erros
 │           ├── memory/           # Repositório thread-safe em memória
-│           ├── worker/           # IPC e controle de processos de treinamento
+│           ├── nats/             # Publicador NATS JetStream
+│           ├── onvif/            # Scanner WS-Discovery e SOAP ONVIF
+│           ├── vmd/              # Detector de movimento por grade de células
 │           └── shm/              # Gerenciador de memória compartilhada POSIX (/dev/shm)
 ├── crates/hydra-engine/          # Motor Data Plane em Rust (Lock-free Ring Buffer & Governor)
-├── worker_python/                # Worker de treinamento e inferência Ultralytics / PyTorch
-├── sdk/python/                   # SDK Python Zero-Copy para analíticos
-└── web/                          # Frontend SPA (HTML/CSS/JS ou React)
+└── sdk/python/                   # SDK Python Zero-Copy para analíticos
 ```
 
 ### Regras Inquebráveis de Backend:

@@ -20,6 +20,14 @@ type StreamUseCase interface {
 	InjectChaos(ctx context.Context, injection *domain.ChaosInjection) (*domain.ChaosResult, error)
 	ResetChaos(ctx context.Context) error
 
+	// Observability, Health & Telemetry
+	GetHealth(ctx context.Context) (*domain.SystemHealth, error)
+	GetHardwareTelemetry(ctx context.Context) (*domain.HardwareTelemetry, error)
+	GetUnifiedTelemetry(ctx context.Context) (*domain.UnifiedTelemetry, error)
+	GetLogs(ctx context.Context, filter domain.LogFilter) (*domain.LogQueryResult, error)
+	GetErrorSummary(ctx context.Context) (*domain.ErrorSummary, error)
+	RecordLog(level domain.LogLevel, component, message string, details map[string]interface{})
+
 	// ONVIF discovery and probing
 	DiscoverONVIFDevices(ctx context.Context) ([]domain.ONVIFDevice, error)
 	ProbeONVIFDevice(ctx context.Context, req domain.ONVIFProbeRequest) (*domain.ONVIFDevice, error)

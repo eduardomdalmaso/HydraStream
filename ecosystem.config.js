@@ -54,6 +54,9 @@ module.exports = {
       restart_delay: 2000,
       env: {
         PORT: "8083",
+        DATABASE_URL: "postgres://postgres:postgres@127.0.0.1:5432/hydravms?sslmode=disable",
+        NATS_URL: "nats://127.0.0.1:4222",
+        MINIO_ENDPOINT: "127.0.0.1:9000",
       },
     },
 

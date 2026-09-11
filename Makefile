@@ -7,8 +7,8 @@ all: dev
 
 # Run HydraStream in Live Development Mode
 dev:
-	@echo "🚀 Starting HydraStream in LIVE DEV MODE..."
-	@echo "💡 Web UI changes in web/ will reflect instantly on browser refresh (F5)!"
+	@echo "🚀 Starting HydraStream Data Plane Engine..."
+	@echo "📡 REST API & Telemetry endpoints active on port 8080"
 	go run ./cmd/hydrastream
 
 # Run MediaMTX RTSP Server binary

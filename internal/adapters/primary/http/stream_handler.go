@@ -334,17 +334,17 @@ func (h *Handler) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(info)
 }
 
-func (h *Handler) handleHealthz(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleHealthz(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
 }
 
-func (h *Handler) handleReadyz(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleReadyz(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("READY"))
 }
 
-func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	fmt.Fprintf(w, "# HELP hydrastream_ingest_fps Input FPS per stream\n")
 	fmt.Fprintf(w, "# TYPE hydrastream_ingest_fps gauge\n")

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	httpAdapter "hydrastream/internal/adapters/primary/http"
 	"hydrastream/internal/adapters/secondary/gpu"
 	"hydrastream/internal/adapters/secondary/ingest"
+	"hydrastream/internal/adapters/secondary/logger"
 	"hydrastream/internal/adapters/secondary/memory"
 	natsAdapter "hydrastream/internal/adapters/secondary/nats"
 	"hydrastream/internal/adapters/secondary/onvif"
@@ -55,29 +57,29 @@ func startEmbeddedMediaMTX() *exec.Cmd {
 }
 
 func main() {
-	log.Println("[HydraStream] Initializing Control Plane Engine (Hexagonal Architecture + DDD)...")
+	// Initialize in-memory ring-buffer logger and pipe stdout
+	ringLogger := logger.NewRingLogger(1000)
+	log.SetOutput(io.MultiWriter(os.Stdout, ringLogger))
+
+	log.Println("[HydraStream] Initializing Data Plane Engine (Hexagonal Architecture + DDD)...")
 
 	// Detect underlying GPU Hardware
 	hw := gpu.DetectHardware()
 
-	// 1. Driven Adapters (Secondary - Storage, RTSP Ingestor & ONVIF Scanner)
+	// 1. Driven Adapters (Secondary - Storage, RTSP Ingestor, ONVIF Scanner & Ring Logger)
 	streamRepo := memory.NewStreamRepository()
 	rtspIngestor := ingest.NewRTSPIngestor()
 	onvifAdapter := onvif.NewONVIFAdapter()
 
 	// 2. Application Layer (Service / Use Case)
-	streamService := application.NewStreamService(streamRepo, rtspIngestor, onvifAdapter)
+	streamService := application.NewStreamService(streamRepo, rtspIngestor, onvifAdapter, ringLogger)
 
-	// 3. Driving Adapter (Primary - HTTP REST API)
+	// 3. Driving Adapter (Primary - HTTP REST API & Telemetry)
 	apiHandler := httpAdapter.NewHandler(streamService)
 
-	// 4. Create ServeMux and register routes
+	// 4. Create ServeMux and register all routes
 	mux := http.NewServeMux()
 	apiHandler.RegisterRoutes(mux)
-
-	// Serve Web UI files
-	fileServer := http.FileServer(http.Dir("web"))
-	mux.Handle("/", fileServer)
 
 	// 5. Start Embedded MediaMTX RTSP server if not already running
 	mtxCmd := startEmbeddedMediaMTX()
@@ -100,7 +102,7 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("[HydraStream] Control Plane & Web UI listening on http://localhost%s\n", port)
+		log.Printf("[HydraStream] Data Plane API & Telemetry listening on http://localhost%s\n", port)
 		log.Printf("[HydraStream] Status: ONLINE | Active Hardware: %s [%s]\n", hw.Model, hw.EngineName)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("[HydraStream] Server failed: %v", err)
@@ -112,7 +114,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("🛑 [HydraStream] Shutting down Control Plane gracefully...")
+	log.Println("🛑 [HydraStream] Shutting down Data Plane gracefully...")
 	if natsPub != nil {
 		natsPub.Close()
 	}

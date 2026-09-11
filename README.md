@@ -137,10 +137,11 @@ HydraStream/
 │   ├── ports/              # Hexagonal Architecture Interfaces (UseCases, Ingestor, Repo)
 │   ├── application/        # Application Services & dynamic hardware telemetry
 │   └── adapters/
-│       ├── primary/http/   # REST API Handlers, Router, and Swagger OpenAPI Docs
+│       ├── primary/http/   # REST API Handlers, Telemetry, Logs, and Swagger OpenAPI Docs
 │       └── secondary/
 │           ├── ingest/     # Native RFC 2326 RTSP / TCP / RTP Demuxer
 │           ├── gpu/        # Real-time NVIDIA GPU Hardware Detector (RTX 5090/4090)
+│           ├── logger/     # In-memory thread-safe Ring Buffer log collector
 │           ├── memory/     # In-Memory Thread-Safe Stream Repository
 │           └── shm/        # Go POSIX SHM inspection adapter
 ├── sdk/
@@ -148,21 +149,34 @@ HydraStream/
 ├── examples/
 │   └── python_consumer.py  # Python OpenCV & YOLO zero-copy consumer example
 ├── bin/                    # Compiled binaries & local MediaMTX server
-├── web/                    # Dashboard Web UI (HTML/CSS/JS < 100 lines/file)
 ├── Makefile                # Build, Test, Benchmark, MediaMTX automation
 └── README.md
 ```
 
 ---
 
+## Real-Time Telemetry & Observability Endpoints
+
+| Endpoint | Method | Description |
+| :--- | :---: | :--- |
+| `GET /api/v1/health` | `GET` | Comprehensive system health & readiness check for all subsystems (RTSP, MediaMTX, SHM, NATS, GPU). |
+| `GET /api/v1/telemetry` | `GET` | Unified payload aggregating health, hardware consumption, and error diagnostics. |
+| `GET /api/v1/telemetry/hardware` | `GET` | Real-time Host CPU cores/goroutines, Host/Go memory, NVIDIA RTX 5090 VRAM/utilization/temp, and `/dev/shm`. |
+| `GET /api/v1/telemetry/logs` | `GET` | Query in-memory ring buffer logs with level, component, limit and timestamp filtering. |
+| `POST /api/v1/telemetry/logs` | `POST` | Ingest custom diagnostic events into the ring buffer. |
+| `GET /api/v1/telemetry/errors` | `GET` | Error breakdown by component, recent error traces, and anomaly counts. |
+| `GET /healthz` & `/readyz` | `GET` | Standard Kubernetes/monitoring liveness and readiness probes. |
+| `GET /swagger/` | `GET` | Interactive Swagger UI API documentation. |
+
+---
+
 ## Quick Start & Development
 
-### 1. Run HydraStream in Live Dev Mode
+### 1. Run HydraStream
 ```bash
 make dev
 ```
-> Starts the Go Control Plane & Web UI on **`http://localhost:8080`**.
-> Any changes in `web/` reflect instantly upon browser refresh (**F5**)!
+> Starts the Data Plane Engine in Go with REST & Telemetry endpoints on **`http://localhost:8080`**.
 
 ### 2. Run Local MediaMTX RTSP Server (Bundled)
 ```bash
