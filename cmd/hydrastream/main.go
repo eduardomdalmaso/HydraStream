@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -84,16 +85,25 @@ func main() {
 	// 5. Start Embedded MediaMTX RTSP server if not already running
 	mtxCmd := startEmbeddedMediaMTX()
 
-	// 6. Connect to NATS Event Mesh if available
-	natsPub, err := natsAdapter.NewStreamNATSPublisher("nats://localhost:4222")
+	// 6. Connect to NATS Event Mesh if configured or available
+	natsURL := os.Getenv("NATS_URL")
+	if natsURL == "" {
+		natsURL = "nats://localhost:4222"
+	}
+	natsPub, err := natsAdapter.NewStreamNATSPublisher(natsURL)
 	if err != nil {
-		log.Printf("⚠️ [HydraStream] NATS Event Mesh not reachable: %v (continuing standalone mode)\n", err)
+		log.Printf("⚠️ [HydraStream] NATS Event Mesh (%s) not reachable: %v (continuing standalone mode)\n", natsURL, err)
 	} else {
-		log.Println("✅ [HydraStream] NATS Event Mesh connected and active!")
+		log.Printf("✅ [HydraStream] NATS Event Mesh connected to %s!\n", natsURL)
 		rtspIngestor.SetPublisher(natsPub)
 	}
 
-	port := ":8080"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = ":8080"
+	} else if !strings.HasPrefix(port, ":") {
+		port = ":" + port
+	}
 	server := &http.Server{
 		Addr:         port,
 		Handler:      httpAdapter.WithCORS(mux),

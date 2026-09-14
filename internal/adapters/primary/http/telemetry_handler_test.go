@@ -1,11 +1,17 @@
 package http_test
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	httpAdapter "hydrastream/internal/adapters/primary/http"
 	"hydrastream/internal/adapters/secondary/logger"
@@ -13,6 +19,28 @@ import (
 	"hydrastream/internal/application"
 	"hydrastream/internal/domain"
 )
+
+func init() {
+	os.Setenv("JWT_SECRET", "super-secret-key-that-is-at-least-32-chars-long-for-testing!")
+	os.Setenv("SERVICE_API_KEY", "test-hydra-service-api-key")
+}
+
+func generateTestToken(tenantID, role string) string {
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
+	payloadData, _ := json.Marshal(map[string]interface{}{
+		"user_id":   "test-user-123",
+		"tenant_id": tenantID,
+		"role":      role,
+		"exp":       time.Now().Add(1 * time.Hour).Unix(),
+	})
+	payload := base64.RawURLEncoding.EncodeToString(payloadData)
+
+	mac := hmac.New(sha256.New, []byte("super-secret-key-that-is-at-least-32-chars-long-for-testing!"))
+	mac.Write([]byte(header + "." + payload))
+	sig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+
+	return fmt.Sprintf("%s.%s.%s", header, payload, sig)
+}
 
 func setupTestServer() *http.ServeMux {
 	repo := memory.NewStreamRepository()
@@ -25,10 +53,23 @@ func setupTestServer() *http.ServeMux {
 	return mux
 }
 
+func TestUnauthenticatedRequestBlocked(t *testing.T) {
+	mux := setupTestServer()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401 Unauthorized, got %d", w.Code)
+	}
+}
+
 func TestHealthEndpoint(t *testing.T) {
 	mux := setupTestServer()
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
+	req.Header.Set("Authorization", "Bearer "+generateTestToken("tenant_alpha", "viewer"))
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 
@@ -53,6 +94,7 @@ func TestHardwareTelemetryEndpoint(t *testing.T) {
 	mux := setupTestServer()
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/telemetry/hardware", nil)
+	req.Header.Set("X-API-Key", "test-hydra-service-api-key")
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 
@@ -77,6 +119,7 @@ func TestUnifiedTelemetryEndpoint(t *testing.T) {
 	mux := setupTestServer()
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/telemetry", nil)
+	req.Header.Set("Authorization", "Bearer "+generateTestToken("tenant_alpha", "viewer"))
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 
@@ -96,11 +139,13 @@ func TestUnifiedTelemetryEndpoint(t *testing.T) {
 
 func TestLogsAndErrorsEndpoints(t *testing.T) {
 	mux := setupTestServer()
+	token := generateTestToken("tenant_alpha", "admin")
 
 	// 1. Ingest a log via POST
 	logBody := `{"level":"ERROR","component":"test_ingest","message":"RTSP packet dropped"}`
 	postReq := httptest.NewRequest(http.MethodPost, "/api/v1/telemetry/logs", strings.NewReader(logBody))
 	postReq.Header.Set("Content-Type", "application/json")
+	postReq.Header.Set("Authorization", "Bearer "+token)
 	wPost := httptest.NewRecorder()
 	mux.ServeHTTP(wPost, postReq)
 
@@ -110,6 +155,7 @@ func TestLogsAndErrorsEndpoints(t *testing.T) {
 
 	// 2. Query logs via GET
 	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/telemetry/logs?level=ERROR", nil)
+	getReq.Header.Set("Authorization", "Bearer "+token)
 	wGet := httptest.NewRecorder()
 	mux.ServeHTTP(wGet, getReq)
 
@@ -131,6 +177,7 @@ func TestLogsAndErrorsEndpoints(t *testing.T) {
 
 	// 3. Query errors summary via GET
 	errReq := httptest.NewRequest(http.MethodGet, "/api/v1/telemetry/errors", nil)
+	errReq.Header.Set("Authorization", "Bearer "+token)
 	wErr := httptest.NewRecorder()
 	mux.ServeHTTP(wErr, errReq)
 
@@ -168,6 +215,6 @@ func TestRootDiscoveryEndpoint(t *testing.T) {
 	}
 
 	if root["service"] != "hydrastream-dataplane" {
-		t.Errorf("expected hydrastream-dataplane, got %v", root["service"])
+		t.Errorf("expected hydrastream-dataplane service, got %v", root["service"])
 	}
 }

@@ -5,15 +5,36 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
+	"hydrastream/internal/adapters/primary/http/middleware"
 	"hydrastream/internal/domain"
 	"hydrastream/internal/ports"
 )
+
+var validStreamIDRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
+
+func isValidStreamID(id string) bool {
+	return validStreamIDRegex.MatchString(id)
+}
+
+func isValidSourceURL(rawURL string) bool {
+	if strings.HasPrefix(rawURL, "synthetic://") {
+		return true
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	scheme := strings.ToLower(u.Scheme)
+	return scheme == "rtsp" || scheme == "rtmp" || scheme == "http" || scheme == "https" || scheme == "file"
+}
 
 // Handler wraps primary HTTP adapters and dependencies.
 type Handler struct {
@@ -28,10 +49,20 @@ func NewHandler(uc ports.StreamUseCase) *Handler {
 func (h *Handler) handleStreams(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	callerTenant := middleware.GetTenantID(r.Context())
+	callerRole := middleware.GetUserRole(r.Context())
+
 	switch r.Method {
 	case http.MethodGet:
 		searchQuery := r.URL.Query().Get("search")
-		tenantFilter := r.URL.Query().Get("tenant")
+		tenantFilter := callerTenant
+		// Superadmin or system service accounts can optionally filter across all tenants
+		if (callerRole == "superadmin" || callerRole == "system") && r.URL.Query().Get("tenant") != "" {
+			tenantFilter = r.URL.Query().Get("tenant")
+		} else if callerRole == "superadmin" && r.URL.Query().Get("all") == "true" {
+			tenantFilter = ""
+		}
+
 		sortBy := r.URL.Query().Get("sort_by")
 		page := 1
 		limit := 10
@@ -58,10 +89,32 @@ func (h *Handler) handleStreams(w http.ResponseWriter, r *http.Request) {
 		})
 
 	case http.MethodPost:
+		if callerRole != "admin" && callerRole != "operator" && callerRole != "superadmin" && callerRole != "system" {
+			http.Error(w, `{"error":"forbidden: insufficient role permissions"}`, http.StatusForbidden)
+			return
+		}
+
 		var st domain.Stream
 		if err := json.NewDecoder(r.Body).Decode(&st); err != nil {
 			http.Error(w, `{"error":"invalid JSON body"}`, http.StatusBadRequest)
 			return
+		}
+
+		if !isValidStreamID(st.StreamID) {
+			http.Error(w, `{"error":"invalid stream_id: must be alphanumeric (1-64 chars)"}`, http.StatusBadRequest)
+			return
+		}
+
+		if !isValidSourceURL(st.SourceURL) {
+			http.Error(w, `{"error":"invalid source_url: protocol not allowed"}`, http.StatusBadRequest)
+			return
+		}
+
+		// Enforce tenant boundary
+		if callerRole != "superadmin" && callerRole != "system" {
+			st.TenantID = callerTenant
+		} else if st.TenantID == "" {
+			st.TenantID = callerTenant
 		}
 
 		if err := h.useCase.RegisterStream(r.Context(), &st); err != nil {
@@ -88,28 +141,52 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	streamID := parts[0]
+	if !isValidStreamID(streamID) {
+		http.Error(w, `{"error":"invalid stream_id"}`, http.StatusBadRequest)
+		return
+	}
+
+	callerTenant := middleware.GetTenantID(r.Context())
+	callerRole := middleware.GetUserRole(r.Context())
+
+	// Helper to verify tenant ownership and prevent IDOR
+	checkOwnership := func() (*domain.Stream, error) {
+		st, err := h.useCase.GetStream(r.Context(), streamID)
+		if err != nil {
+			return nil, err
+		}
+		if callerRole != "superadmin" && callerRole != "system" && st.TenantID != callerTenant {
+			return nil, domain.ErrStreamNotFound
+		}
+		return st, nil
+	}
 
 	// Route: GET /api/v1/streams/{id}/snapshot or snapshot.jpg
 	if len(parts) >= 2 && (parts[1] == "snapshot" || parts[1] == "snapshot.jpg") {
+		if _, err := checkOwnership(); err != nil {
+			http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
+			return
+		}
 		h.handleSnapshot(w, r, streamID)
 		return
 	}
 
 	// Route: GET /api/v1/streams/{id}/mjpeg
 	if len(parts) >= 2 && parts[1] == "mjpeg" {
-		h.handleMJPEG(w, r, streamID)
+		st, err := checkOwnership()
+		if err != nil {
+			http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
+			return
+		}
+		h.handleMJPEG(w, r, st)
 		return
 	}
 
 	// Route: GET /api/v1/streams/{id}/stats
 	if len(parts) >= 2 && parts[1] == "stats" {
-		st, err := h.useCase.GetStream(r.Context(), streamID)
+		st, err := checkOwnership()
 		if err != nil {
-			if errors.Is(err, domain.ErrStreamNotFound) {
-				http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
-			} else {
-				http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-			}
+			http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
 			return
 		}
 		json.NewEncoder(w).Encode(st)
@@ -118,6 +195,10 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 
 	// Route: GET /api/v1/streams/{id}/ingest
 	if len(parts) >= 2 && parts[1] == "ingest" {
+		if _, err := checkOwnership(); err != nil {
+			http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
+			return
+		}
 		stat, err := h.useCase.GetIngestStats(r.Context(), streamID)
 		if err != nil {
 			if errors.Is(err, domain.ErrStreamNotFound) {
@@ -133,6 +214,15 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 
 	// Route: PATCH /api/v1/streams/{id}/consumers/{analytic_type}
 	if len(parts) >= 3 && parts[1] == "consumers" && r.Method == http.MethodPatch {
+		if callerRole != "admin" && callerRole != "operator" && callerRole != "superadmin" {
+			http.Error(w, `{"error":"forbidden: insufficient permissions"}`, http.StatusForbidden)
+			return
+		}
+		if _, err := checkOwnership(); err != nil {
+			http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
+			return
+		}
+
 		analyticType := parts[2]
 		var req struct {
 			TargetFPS    float64 `json:"target_fps"`
@@ -154,18 +244,23 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 	// Direct Stream CRUD
 	switch r.Method {
 	case http.MethodGet:
-		st, err := h.useCase.GetStream(r.Context(), streamID)
+		st, err := checkOwnership()
 		if err != nil {
-			if errors.Is(err, domain.ErrStreamNotFound) {
-				http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
-			} else {
-				http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-			}
+			http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
 			return
 		}
 		json.NewEncoder(w).Encode(st)
 
 	case http.MethodDelete:
+		if callerRole != "admin" && callerRole != "operator" && callerRole != "superadmin" {
+			http.Error(w, `{"error":"forbidden: insufficient permissions"}`, http.StatusForbidden)
+			return
+		}
+		if _, err := checkOwnership(); err != nil {
+			http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
+			return
+		}
+
 		if err := h.useCase.DeleteStream(r.Context(), streamID); err != nil {
 			if errors.Is(err, domain.ErrStreamNotFound) {
 				http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
@@ -186,7 +281,14 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 
-	samplePath := filepath.Join("samples", fmt.Sprintf("%s.jpg", streamID))
+	// Strict path sanitization against Path Traversal
+	cleanBase := filepath.Base(streamID)
+	samplePath := filepath.Clean(filepath.Join("samples", fmt.Sprintf("%s.jpg", cleanBase)))
+	if !strings.HasPrefix(samplePath, "samples") && !strings.HasPrefix(samplePath, "samples/") {
+		http.Error(w, `{"error":"invalid path"}`, http.StatusBadRequest)
+		return
+	}
+
 	isRefresh := r != nil && (r.URL.Query().Get("refresh") == "true" || r.URL.Query().Get("force") == "true")
 
 	// 1. Tentar ler frame cacheado caso não tenha sido solicitado refresh
@@ -199,11 +301,11 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 
 	// 2. Capturar frame sob demanda do MediaMTX (sub-stream ou main stream)
 	snapCmd := exec.Command("ffmpeg", "-rtsp_transport", "tcp", "-timeout", "3000000",
-		"-i", fmt.Sprintf("rtsp://localhost:8554/%s_sub", streamID),
+		"-i", fmt.Sprintf("rtsp://localhost:8554/%s_sub", cleanBase),
 		"-frames:v", "1", "-q:v", "2", "-y", samplePath)
 	if err := snapCmd.Run(); err != nil {
 		snapCmd = exec.Command("ffmpeg", "-rtsp_transport", "tcp", "-timeout", "3000000",
-			"-i", fmt.Sprintf("rtsp://localhost:8554/%s", streamID),
+			"-i", fmt.Sprintf("rtsp://localhost:8554/%s", cleanBase),
 			"-frames:v", "1", "-q:v", "2", "-y", samplePath)
 		_ = snapCmd.Run()
 	}
@@ -218,9 +320,11 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 		_, _ = w.Write(data)
 		return
 	}
+
+	http.Error(w, `{"error":"snapshot unavailable"}`, http.StatusServiceUnavailable)
 }
 
-func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, streamID string) {
+func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, st *domain.Stream) {
 	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=ffmpeg")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.Header().Set("Pragma", "no-cache")
@@ -232,6 +336,7 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, streamID s
 		flusher.Flush()
 	}
 
+	streamID := filepath.Base(st.StreamID)
 	// 1. Primary source: MediaMTX Data Plane Relay on localhost:8554
 	targetURL := fmt.Sprintf("rtsp://localhost:8554/%s_sub", streamID)
 	if r.URL.Query().Get("main") == "1" {
@@ -272,8 +377,7 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, streamID s
 				return
 			}
 			// 2. Direct Camera fallback if registered in stream repository
-			st, findErr := h.useCase.GetStream(r.Context(), streamID)
-			if findErr == nil && st != nil && st.SourceURL != "" && !strings.HasPrefix(st.SourceURL, "synthetic://") {
+			if st.SourceURL != "" && !strings.HasPrefix(st.SourceURL, "synthetic://") && isValidSourceURL(st.SourceURL) {
 				directURL := st.SourceURL
 				if strings.Contains(directURL, "/stream1") && r.URL.Query().Get("main") != "1" {
 					directURL = strings.Replace(directURL, "/stream1", "/stream2", 1)
@@ -287,7 +391,7 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, streamID s
 				}
 			}
 			// 3. Fallback to sample ticker if media relay and direct are offline
-			samplePath := filepath.Join("samples", fmt.Sprintf("%s.jpg", streamID))
+			samplePath := filepath.Clean(filepath.Join("samples", fmt.Sprintf("%s.jpg", streamID)))
 			fallbackPath := "samples/cam_entrance_01.jpg"
 			data, err := os.ReadFile(samplePath)
 			if err != nil || len(data) == 0 {
@@ -389,4 +493,3 @@ func (h *Handler) handleChaosReset(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"reset","message":"All chaos injection circuits disarmed and telemetry stabilized."}`))
 }
-

@@ -45,6 +45,49 @@ type StreamProbeResponse struct {
 	RTSPURL      string `json:"rtsp_url,omitempty"`
 }
 
+// isBlockedIPTarget validates that the target IP is not an internal loopback or cloud metadata IP (SSRF guard).
+func isBlockedIPTarget(host string) error {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return fmt.Errorf("endereço de destino vazio")
+	}
+
+	// Block standard loopback and metadata hostnames
+	if strings.EqualFold(host, "localhost") || strings.EqualFold(host, "127.0.0.1") || strings.EqualFold(host, "::1") {
+		// Allowed in development only if explicit
+		if os.Getenv("ALLOW_LOCAL_PROBE") != "true" {
+			return fmt.Errorf("requisições para localhost/loopback bloqueadas por política de segurança SSRF")
+		}
+	}
+
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		// If cannot resolve hostname, return error
+		ip := net.ParseIP(host)
+		if ip == nil {
+			return fmt.Errorf("falha ao resolver endereço IP de '%s'", host)
+		}
+		ips = []net.IP{ip}
+	}
+
+	for _, ip := range ips {
+		// Block Cloud Metadata Service (AWS, GCP, Azure: 169.254.169.254)
+		if ip.String() == "169.254.169.254" {
+			return fmt.Errorf("acesso ao serviço de metadados cloud (169.254.169.254) estritamente bloqueado")
+		}
+
+		if ip.IsLoopback() && os.Getenv("ALLOW_LOCAL_PROBE") != "true" {
+			return fmt.Errorf("endereço IP loopback (%s) bloqueado por segurança", ip.String())
+		}
+
+		if ip.IsMulticast() || ip.IsUnspecified() {
+			return fmt.Errorf("endereço IP inválido ou não roteável (%s)", ip.String())
+		}
+	}
+
+	return nil
+}
+
 // HandleProbeStream tests real-time reachability of RTSP, ONVIF, or RTMP streams.
 func (h *Handler) HandleProbeStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -92,8 +135,8 @@ func (h *Handler) HandleListSamples(w http.ResponseWriter, r *http.Request) {
 	var samples []map[string]string
 
 	sampleDirs := []string{
-		"/home/hades/Documents/HydraStream/samples",
 		"samples",
+		"/home/hades/Documents/HydraStream/samples",
 	}
 
 	for _, sDir := range sampleDirs {
@@ -103,7 +146,7 @@ func (h *Handler) HandleListSamples(w http.ResponseWriter, r *http.Request) {
 				if !f.IsDir() && (strings.HasSuffix(f.Name(), ".mp4") || strings.HasSuffix(f.Name(), ".mkv") || strings.HasSuffix(f.Name(), ".avi")) {
 					samples = append(samples, map[string]string{
 						"name": f.Name(),
-						"path": filepath.Join(sDir, f.Name()),
+						"path": filepath.Join("samples", f.Name()),
 					})
 				}
 			}
@@ -117,11 +160,11 @@ func (h *Handler) HandleListSamples(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) probeLoopFile(w http.ResponseWriter, req StreamProbeRequest) {
-	filePath := strings.TrimPrefix(req.URL, "file://")
-	if filePath == "" {
-		filePath = req.IPAddress
+	rawPath := strings.TrimPrefix(req.URL, "file://")
+	if rawPath == "" {
+		rawPath = req.IPAddress
 	}
-	if filePath == "" {
+	if rawPath == "" {
 		_ = json.NewEncoder(w).Encode(StreamProbeResponse{
 			Online: false,
 			Error:  "Caminho do arquivo de vídeo é obrigatório",
@@ -129,10 +172,19 @@ func (h *Handler) probeLoopFile(w http.ResponseWriter, req StreamProbeRequest) {
 		return
 	}
 
+	// Strictly restrict file inspection to samples/ directory (LFI Protection)
+	cleanBase := filepath.Base(rawPath)
+	if !strings.HasSuffix(cleanBase, ".mp4") && !strings.HasSuffix(cleanBase, ".mkv") && !strings.HasSuffix(cleanBase, ".avi") && !strings.HasSuffix(cleanBase, ".jpg") {
+		_ = json.NewEncoder(w).Encode(StreamProbeResponse{
+			Online: false,
+			Error:  "Extensão de arquivo de mídia inválida",
+		})
+		return
+	}
+
 	candidates := []string{
-		filePath,
-		filepath.Join("/home/hades/Documents/HydraStream/samples", filePath),
-		filepath.Join("samples", filePath),
+		filepath.Clean(filepath.Join("samples", cleanBase)),
+		filepath.Clean(filepath.Join("/home/hades/Documents/HydraStream/samples", cleanBase)),
 	}
 
 	var foundPath string
@@ -146,7 +198,7 @@ func (h *Handler) probeLoopFile(w http.ResponseWriter, req StreamProbeRequest) {
 	if foundPath == "" {
 		_ = json.NewEncoder(w).Encode(StreamProbeResponse{
 			Online: false,
-			Error:  fmt.Sprintf("Arquivo não encontrado no disco: %s", filePath),
+			Error:  fmt.Sprintf("Arquivo não encontrado na pasta de amostras: %s", cleanBase),
 		})
 		return
 	}
@@ -210,6 +262,15 @@ func (h *Handler) probeONVIF(w http.ResponseWriter, r *http.Request, req StreamP
 		})
 		return
 	}
+
+	if err := isBlockedIPTarget(ip); err != nil {
+		_ = json.NewEncoder(w).Encode(StreamProbeResponse{
+			Online: false,
+			Error:  fmt.Sprintf("Bloqueio de Segurança: %v", err),
+		})
+		return
+	}
+
 	if port <= 0 {
 		port = 80
 	}
@@ -282,6 +343,14 @@ func (h *Handler) probeRTSP(w http.ResponseWriter, req StreamProbeRequest) {
 		return
 	}
 
+	if err := isBlockedIPTarget(host); err != nil {
+		_ = json.NewEncoder(w).Encode(StreamProbeResponse{
+			Online: false,
+			Error:  fmt.Sprintf("Bloqueio de Segurança: %v", err),
+		})
+		return
+	}
+
 	addr := fmt.Sprintf("%s:%d", host, port)
 	start := time.Now()
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
@@ -350,6 +419,14 @@ func (h *Handler) probeRTMP(w http.ResponseWriter, req StreamProbeRequest) {
 	}
 	if port <= 0 {
 		port = 1935
+	}
+
+	if err := isBlockedIPTarget(host); err != nil {
+		_ = json.NewEncoder(w).Encode(StreamProbeResponse{
+			Online: false,
+			Error:  fmt.Sprintf("Bloqueio de Segurança: %v", err),
+		})
+		return
 	}
 
 	addr := fmt.Sprintf("%s:%d", host, port)
