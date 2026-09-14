@@ -96,7 +96,7 @@ func main() {
 	port := ":8080"
 	server := &http.Server{
 		Addr:         port,
-		Handler:      mux,
+		Handler:      httpAdapter.WithCORS(mux),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 	}

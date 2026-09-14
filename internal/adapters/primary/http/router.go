@@ -13,6 +13,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// Stream Management Endpoints
 	mux.HandleFunc("/api/v1/streams", h.handleStreams)
 	mux.HandleFunc("/api/v1/streams/", h.handleStreamByID)
+	mux.HandleFunc("/api/v1/streams/probe", h.HandleProbeStream)
+	mux.HandleFunc("/api/v1/streams/samples", h.HandleListSamples)
 	mux.HandleFunc("/api/v1/cluster/topology", h.handleClusterTopology)
 	mux.HandleFunc("/api/v1/info", h.handleSystemInfo)
 	mux.HandleFunc("/api/v1/chaos/inject", h.handleChaosInject)
@@ -43,4 +45,21 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/healthz", telH.HandleHealthz)
 	mux.HandleFunc("/readyz", telH.HandleReadyz)
 	mux.HandleFunc("/metrics", h.handleMetrics)
+}
+
+// WithCORS wraps an http.Handler with universal Cross-Origin Resource Sharing headers.
+func WithCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Range, Accept, Origin")
+		w.Header().Set("Access-Control-Expose-Headers", "Content-Length, Content-Range, Content-Type")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
