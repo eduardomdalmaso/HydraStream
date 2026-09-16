@@ -38,13 +38,20 @@ func isValidSourceURL(rawURL string) bool {
 
 // Handler wraps primary HTTP adapters and dependencies.
 type Handler struct {
-	useCase ports.StreamUseCase
+	useCase     ports.StreamUseCase
+	fragHandler *FragmentHandler
+	whepHandler *WHEPHandler
 }
 
 // NewHandler initializes HTTP handler adapters.
 func NewHandler(uc ports.StreamUseCase) *Handler {
-	return &Handler{useCase: uc}
+	return &Handler{
+		useCase:     uc,
+		fragHandler: NewFragmentHandler(uc),
+		whepHandler: NewWHEPHandler(uc),
+	}
 }
+
 
 func (h *Handler) handleStreams(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -211,6 +218,31 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(stat)
 		return
 	}
+
+	// Route: /api/v1/streams/{id}/recordings/fragments...
+	if len(parts) >= 3 && parts[1] == "recordings" && parts[2] == "fragments" {
+		if _, err := checkOwnership(); err != nil {
+			http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
+			return
+		}
+		var subParts []string
+		if len(parts) > 3 {
+			subParts = parts[3:]
+		}
+		h.fragHandler.HandleStreamFragments(w, r, streamID, subParts)
+		return
+	}
+
+	// Route: /api/v1/streams/{id}/whep...
+	if len(parts) >= 2 && parts[1] == "whep" {
+		var subParts []string
+		if len(parts) > 2 {
+			subParts = parts[2:]
+		}
+		h.whepHandler.HandleStreamWHEP(w, r, streamID, subParts)
+		return
+	}
+
 
 	// Route: PATCH /api/v1/streams/{id}/consumers/{analytic_type}
 	if len(parts) >= 3 && parts[1] == "consumers" && r.Method == http.MethodPatch {

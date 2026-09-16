@@ -2,9 +2,11 @@ package ports
 
 import (
 	"context"
+	"time"
 
 	"hydrastream/internal/domain"
 )
+
 
 // StreamUseCase defines primary port interface for application services.
 type StreamUseCase interface {
@@ -31,4 +33,15 @@ type StreamUseCase interface {
 	// ONVIF discovery and probing
 	DiscoverONVIFDevices(ctx context.Context) ([]domain.ONVIFDevice, error)
 	ProbeONVIFDevice(ctx context.Context, req domain.ONVIFProbeRequest) (*domain.ONVIFDevice, error)
+
+	// Recording Fragments (Video Segments)
+	SaveRecordingFragment(ctx context.Context, frag *domain.RecordingFragment, data []byte) error
+	GetRecordingFragment(ctx context.Context, streamID, fragmentID string) (*domain.RecordingFragment, []byte, error)
+	ListRecordingFragments(ctx context.Context, streamID string, start, end time.Time, limit int) ([]*domain.RecordingFragment, error)
+
+	// WebRTC HTTP Egress Protocol (WHEP)
+	HandleWHEPOffer(ctx context.Context, streamID string, sdpOffer string) (*domain.WHEPAnswer, error)
+	HandleWHEPPatch(ctx context.Context, streamID, sessionID string, patchData string) error
+	HandleWHEPDelete(ctx context.Context, streamID, sessionID string) error
 }
+

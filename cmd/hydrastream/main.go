@@ -96,6 +96,7 @@ func main() {
 	} else {
 		log.Printf("✅ [HydraStream] NATS Event Mesh connected to %s!\n", natsURL)
 		rtspIngestor.SetPublisher(natsPub)
+		streamService.SetRecordingPublisher(natsPub)
 	}
 
 	port := os.Getenv("PORT")

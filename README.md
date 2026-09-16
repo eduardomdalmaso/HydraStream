@@ -110,6 +110,13 @@ HydraStream includes a high-performance **REST API** allowing users and orchestr
 | `DELETE` | `/api/v1/streams/{id}` | Stop ingestion session and delete stream |
 | `GET` | `/api/v1/streams/{id}/ingest` | Real-time RTSP/RTP ingestion telemetry (FPS, bitrate, error recovery) |
 | `PATCH` | `/api/v1/streams/{id}/consumers/{type}` | Dynamically change consumer target FPS or format |
+| `GET` | `/api/v1/streams/{id}/recordings/fragments` | List recorded video segments/fragments for a stream |
+| `POST` | `/api/v1/streams/{id}/recordings/fragments` | Upload and dispatch recording fragments (Multipart / JSON / Binary) |
+| `GET` | `/api/v1/streams/{id}/recordings/fragments/{id}` | Download / stream recorded segment with HTTP 206 Range support |
+| `POST` | `/whep/{stream_id}` & `/api/v1/streams/{id}/whep` | WebRTC HTTP Egress Protocol (WHEP) SDP Offer Negotiation |
+| `OPTIONS` | `/whep/{stream_id}` & `/api/v1/streams/{id}/whep` | WHEP CORS preflight and capabilities |
+| `PATCH` | `/whep/{stream_id}/sessions/{session_id}` | WHEP Trickle ICE candidates exchange |
+| `DELETE` | `/whep/{stream_id}/sessions/{session_id}` | WHEP egress session teardown |
 | `GET` | `/api/v1/telemetry/stats` | Real-time Control Panel telemetry and SVG charts history |
 | `GET` | `/api/v1/info` | Dynamic hardware detection (GPU Model, VRAM, engine modes) |
 | `GET` | `/api/v1/cluster/topology` | Real host node architecture, IP, GPU, and memory topology |

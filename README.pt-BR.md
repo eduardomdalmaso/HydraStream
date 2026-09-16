@@ -110,6 +110,13 @@ O HydraStream inclui uma **API REST** de alta performance permitindo configurar 
 | `DELETE` | `/api/v1/streams/{id}` | Encerra a ingestão e remove o stream |
 | `GET` | `/api/v1/streams/{id}/ingest` | Telemetria ao vivo da ingestão RTSP (FPS, bitrate, erros de socket) |
 | `PATCH` | `/api/v1/streams/{id}/consumers/{type}` | Atualiza dinamicamente o FPS alvo ou formato do analítico |
+| `GET` | `/api/v1/streams/{id}/recordings/fragments` | Lista segmentos/fragmentos de gravação de vídeo de um stream |
+| `POST` | `/api/v1/streams/{id}/recordings/fragments` | Envia e despacha fragmentos de vídeo gravados (Multipart / JSON / Binário) |
+| `GET` | `/api/v1/streams/{id}/recordings/fragments/{id}` | Download / streaming do trecho gravado com suporte a HTTP 206 Range |
+| `POST` | `/whep/{stream_id}` & `/api/v1/streams/{id}/whep` | Negociação de SDP Offer WebRTC HTTP Egress Protocol (WHEP) |
+| `OPTIONS` | `/whep/{stream_id}` & `/api/v1/streams/{id}/whep` | Preflight CORS e capacidades WHEP |
+| `PATCH` | `/whep/{stream_id}/sessions/{session_id}` | Troca de candidatos Trickle ICE WHEP |
+| `DELETE` | `/whep/{stream_id}/sessions/{session_id}` | Encerramento de sessão WHEP |
 | `GET` | `/api/v1/telemetry/stats` | Telemetria do Control Panel e histórico dos gráficos SVG ao vivo |
 | `GET` | `/api/v1/info` | Leitura dinâmica do hardware (modelo da GPU, VRAM, modos de aceleração) |
 | `GET` | `/api/v1/cluster/topology` | Topologia e hardware do nó local (CPU, IP, GPU e memória) |

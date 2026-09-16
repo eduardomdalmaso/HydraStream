@@ -138,6 +138,59 @@ const OpenAPI3Spec = `{
         "responses": { "200": { "description": "Live ingestion stats" } }
       }
     },
+    "/api/v1/streams/{id}/recordings/fragments": {
+      "get": {
+        "summary": "List recorded video fragments for a stream",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "start", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "end", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } }
+        ],
+        "responses": { "200": { "description": "List of recording fragments" } }
+      },
+      "post": {
+        "summary": "Upload and dispatch a new recording video fragment (Multipart or binary)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "201": { "description": "Fragment saved and indexed" } }
+      }
+    },
+    "/api/v1/streams/{id}/recordings/fragments/{fragment_id}": {
+      "get": {
+        "summary": "Download or stream recorded video fragment (supports HTTP 206 Range)",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "fragment_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Video stream payload" }, "206": { "description": "Partial content" } }
+      }
+    },
+    "/api/v1/streams/{id}/whep": {
+      "post": {
+        "summary": "WebRTC HTTP Egress Protocol (WHEP) SDP Offer Negotiation",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/sdp": { "schema": { "type": "string" } } }
+        },
+        "responses": { "201": { "description": "WHEP SDP answer and Location header" } }
+      },
+      "options": {
+        "summary": "WHEP Capabilities and CORS Preflight",
+        "responses": { "200": { "description": "Capabilities returned" } }
+      }
+    },
+    "/whep/{stream_id}": {
+      "post": {
+        "summary": "Standard WHEP Ingress/Egress Gateway Endpoint",
+        "parameters": [{ "name": "stream_id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/sdp": { "schema": { "type": "string" } } }
+        },
+        "responses": { "201": { "description": "WHEP SDP answer and session Location" } }
+      }
+    },
     "/api/v1/info": {
       "get": {
         "summary": "System and GPU Hardware Readout",

@@ -57,7 +57,15 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	authEndpoint("/api/v1/onvif/discover", onvifH.HandleDiscover)
 	authEndpoint("/api/v1/onvif/probe", onvifH.HandleProbe)
 	authEndpoint("/api/v1/onvif/import", onvifH.HandleImport, "admin", "operator", "superadmin")
+
+	// 6. Direct Recording Fragments Ingestion
+	authEndpoint("/api/v1/recordings/fragments", h.fragHandler.HandleGeneralRecordingsIngest, "admin", "operator", "superadmin", "system")
+
+	// 7. WebRTC HTTP Egress Protocol (WHEP) Egress Gateway
+	mux.HandleFunc("/whep", h.whepHandler.HandleRootWHEP)
+	mux.HandleFunc("/whep/", h.whepHandler.HandleRootWHEP)
 }
+
 
 // WithCORS wraps an http.Handler with universal Cross-Origin Resource Sharing headers.
 func WithCORS(next http.Handler) http.Handler {
