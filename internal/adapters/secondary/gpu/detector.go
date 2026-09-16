@@ -9,11 +9,11 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"hydrastream/internal/domain"
 )
+
 
 // HardwareInfo represents real detected GPU and hardware acceleration metrics (backward compatible).
 type HardwareInfo struct {
@@ -164,25 +164,9 @@ func GetCompleteHardwareTelemetry() domain.HardwareTelemetry {
 		}
 	}
 
-	// 4. POSIX SHM metrics
-	shmTel := domain.StorageSHMTelemetry{
-		MountPoint:       "/dev/shm",
-		RingBufferStatus: "ONLINE (Lock-Free)",
-		LockFreeMode:     true,
-	}
+	// 4. POSIX / Windows SHM metrics
+	shmTel := GetSHMTelemetry()
 
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs("/dev/shm", &stat); err == nil && stat.Blocks > 0 {
-		totalBytes := stat.Blocks * uint64(stat.Bsize)
-		freeBytes := stat.Bfree * uint64(stat.Bsize)
-		usedBytes := totalBytes - freeBytes
-		shmTel.TotalBytes = totalBytes
-		shmTel.UsedBytes = usedBytes
-		shmTel.FreeBytes = freeBytes
-		if totalBytes > 0 {
-			shmTel.OccupancyPct = math.Round((float64(usedBytes)/float64(totalBytes))*1000.0) / 10.0
-		}
-	}
 
 	return domain.HardwareTelemetry{
 		Host: domain.HostHardware{

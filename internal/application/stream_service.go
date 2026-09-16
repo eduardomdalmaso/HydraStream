@@ -14,10 +14,10 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"hydrastream/internal/adapters/secondary/gpu"
+
 	"hydrastream/internal/adapters/secondary/logger"
 	"hydrastream/internal/adapters/secondary/memory"
 	"hydrastream/internal/domain"
@@ -435,14 +435,11 @@ func (s *StreamService) GetControlPanelTelemetry(ctx context.Context) (*domain.C
 		hostname = "localhost"
 	}
 
-	shmOccupancy := 0.1
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs("/dev/shm", &stat); err == nil && stat.Blocks > 0 {
-		totalBytes := stat.Blocks * uint64(stat.Bsize)
-		freeBytes := stat.Bfree * uint64(stat.Bsize)
-		usedBytes := totalBytes - freeBytes
-		shmOccupancy = math.Round((float64(usedBytes)/float64(totalBytes))*1000) / 10.0
+	shmOccupancy := gpu.GetSHMTelemetry().OccupancyPct
+	if shmOccupancy <= 0 {
+		shmOccupancy = 0.1
 	}
+
 
 	telemetry := &domain.ControlPanelTelemetry{
 		HealthScore:        healthScore,

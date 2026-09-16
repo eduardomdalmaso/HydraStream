@@ -56,8 +56,18 @@ package-deb:
 	@echo "📦 Building HydraStream .deb Debian/Ubuntu package..."
 	bash scripts/build_deb.sh
 
+# Build Windows .exe & .zip distribution
+package-windows:
+	@echo "📦 Building HydraStream Windows .exe & .zip package..."
+	bash scripts/build_windows.sh
+
+# Build all distribution packages (Linux .deb + Windows .zip)
+package-all: package-deb package-windows
+	@echo "🎉 All distribution packages generated in dist/"
+
 # Clean build artifacts
 clean:
-	rm -rf bin/hydrastream dist
+	rm -rf bin/hydrastream bin/hydrastream.exe dist
 	cargo clean --manifest-path crates/hydra-engine/Cargo.toml
+
 
