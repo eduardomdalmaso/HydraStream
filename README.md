@@ -202,7 +202,15 @@ make stream-sample
 make test
 ```
 
-### 5. Run Rust Zero-Copy Benchmark
+### 5. Generic 1:N Ingestion & Continuous Rust Decoding
+HydraStream automatically operates with simultaneous **1-to-N Fan-Out delivery**:
+- **WebRTC WHEP (`http://localhost:8889/<stream_id>/whep`)**: Instant browser / frontend rendering (< 50ms).
+- **Zero-Copy SHM (`/dev/shm/hydra_<stream_id>`)**: Decoded in real-time by the Rust Engine with NVDEC/GPU acceleration, directly accessible by YOLO models and CV pipelines.
+- **RTSP Relay (`rtsp://127.0.0.1:8554/<stream_id>`)**: For legacy players and NVR recorders.
+
+The global hook in `mediamtx.yml` (`pathDefaults.runOnReady`) dynamically maps any `$MTX_PATH` stream into the POSIX shared memory buffer with zero hardcoding required.
+
+### 6. Run Rust Zero-Copy Benchmark
 ```bash
 make benchmark
 ```
