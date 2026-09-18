@@ -74,9 +74,12 @@ class StreamConsumer:
             return None
         ts, frame_bytes = res
         arr = np.frombuffer(frame_bytes, dtype=np.uint8)
-        if self.format_id in (1, 2):  # RGB24 or BGR24
+        expected_size = self.height * self.width * 3
+        if arr.size == expected_size:
             return ts, arr.reshape((self.height, self.width, 3))
-        return ts, arr
+        elif arr.size > expected_size:
+            return ts, arr[:expected_size].reshape((self.height, self.width, 3))
+        return None
 
     def stream(self, target_fps: float = 30.0) -> Generator[bytes, None, None]:
         """Generator that yields frames at the throttled target FPS."""
