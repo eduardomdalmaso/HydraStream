@@ -36,6 +36,19 @@ pub unsafe fn futex_wake_bitset(uaddr: *const AtomicU32, bitmask: u32) -> i32 {
 }
 
 #[cfg(target_os = "linux")]
+pub unsafe fn futex_wake_one(uaddr: *const AtomicU32) -> i32 {
+    libc::syscall(
+        libc::SYS_futex,
+        uaddr as *const u32,
+        libc::FUTEX_WAKE,
+        1i32,
+        std::ptr::null::<libc::timespec>(),
+        std::ptr::null::<u32>(),
+        0u32,
+    ) as i32
+}
+
+#[cfg(target_os = "linux")]
 pub unsafe fn futex_wait_bitset(uaddr: *const AtomicU32, val: u32, bitmask: u32, timeout: Option<Duration>) -> bool {
     let ts = timeout.map(|d| libc::timespec {
         tv_sec: d.as_secs() as libc::time_t,
@@ -58,6 +71,12 @@ pub unsafe fn futex_wait_bitset(uaddr: *const AtomicU32, val: u32, bitmask: u32,
 #[cfg(not(target_os = "linux"))]
 pub unsafe fn futex_wake_bitset(uaddr: *const AtomicU32, _bitmask: u32) -> i32 {
     atomic_wait::wake_all(&*uaddr);
+    1
+}
+
+#[cfg(not(target_os = "linux"))]
+pub unsafe fn futex_wake_one(uaddr: *const AtomicU32) -> i32 {
+    atomic_wait::wake_one(&*uaddr);
     1
 }
 

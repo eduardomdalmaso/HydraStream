@@ -9,7 +9,7 @@ use std::hint::spin_loop;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
-use crate::transport::{futex_wait_bitset, futex_wake_bitset, BIT_ALL};
+use crate::transport::{futex_wait_bitset, futex_wake_bitset, futex_wake_one, BIT_ALL};
 
 // ---------------------------------------------------------------------------
 // 1. Atomic Semaphore (Backpressure & Bounded Ring Buffer Control)
@@ -151,15 +151,7 @@ impl<T> HybridMutex<T> {
         if self.state.swap(STATE_UNLOCKED, Ordering::Release) == STATE_LOCKED_WITH_WAITERS {
             // Wake one sleeping thread
             unsafe {
-                libc::syscall(
-                    libc::SYS_futex,
-                    &self.state as *const AtomicU32 as *const u32,
-                    libc::FUTEX_WAKE,
-                    1i32,
-                    std::ptr::null::<libc::timespec>(),
-                    std::ptr::null::<u32>(),
-                    0u32,
-                );
+                futex_wake_one(&self.state);
             }
         }
     }
