@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"hydrastream/internal/adapters/secondary/proc"
 	"hydrastream/internal/domain"
 )
 
@@ -33,6 +34,7 @@ func DetectHardware() HardwareInfo {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "nvidia-smi", "--query-gpu=name,memory.total,memory.used,utilization.gpu,temperature.gpu", "--format=csv,noheader,nounits")
+	proc.SetHideWindow(cmd)
 	out, err := cmd.Output()
 	if err == nil {
 		fields := strings.Split(strings.TrimSpace(string(out)), ",")
@@ -128,6 +130,7 @@ func GetCompleteHardwareTelemetry() domain.HardwareTelemetry {
 	cmd := exec.CommandContext(ctx, "nvidia-smi",
 		"--query-gpu=name,memory.total,memory.used,memory.free,utilization.gpu,utilization.memory,temperature.gpu,power.draw,driver_version",
 		"--format=csv,noheader,nounits")
+	proc.SetHideWindow(cmd)
 	if out, err := cmd.Output(); err == nil {
 		fields := strings.Split(strings.TrimSpace(string(out)), ",")
 		if len(fields) >= 9 {

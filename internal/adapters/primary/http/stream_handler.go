@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"hydrastream/internal/adapters/primary/http/middleware"
+	"hydrastream/internal/adapters/secondary/proc"
 	"hydrastream/internal/domain"
 	"hydrastream/internal/ports"
 )
@@ -364,6 +365,7 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 		for _, dbp := range dbPaths {
 			if _, errStat := os.Stat(dbp); errStat == nil {
 				cmd := exec.Command("sqlite3", dbp, fmt.Sprintf("SELECT rtsp_url FROM cameras WHERE id = '%s' LIMIT 1;", cleanBase))
+				proc.SetHideWindow(cmd)
 				if out, errCmd := cmd.Output(); errCmd == nil {
 					u := strings.TrimSpace(string(out))
 					if u != "" {
@@ -389,6 +391,7 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 	for _, u := range urlsToTry {
 		snapCmd := exec.Command(ffmpegBin, "-rtsp_transport", "tcp", "-timeout", "3000000",
 			"-i", u, "-update", "1", "-frames:v", "1", "-q:v", "2", "-y", samplePath)
+		proc.SetHideWindow(snapCmd)
 		if err := snapCmd.Run(); err == nil {
 			if data, errRead := os.ReadFile(samplePath); errRead == nil && len(data) > 0 {
 				_, _ = w.Write(data)
@@ -469,6 +472,7 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, st *domain
 		for _, dbp := range dbPaths {
 			if _, errStat := os.Stat(dbp); errStat == nil {
 				cmd := exec.Command("sqlite3", dbp, fmt.Sprintf("SELECT rtsp_url FROM cameras WHERE id = '%s' LIMIT 1;", streamID))
+				proc.SetHideWindow(cmd)
 				if out, errCmd := cmd.Output(); errCmd == nil {
 					u := strings.TrimSpace(string(out))
 					if u != "" {
@@ -511,6 +515,7 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, st *domain
 		}
 
 		cmd := exec.CommandContext(r.Context(), ffmpegBin, args...)
+		proc.SetHideWindow(cmd)
 		cmd.Stdout = w
 		cmd.Stderr = os.Stderr
 

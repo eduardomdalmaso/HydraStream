@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"hydrastream/internal/adapters/secondary/proc"
 	"hydrastream/internal/domain"
 )
 
@@ -212,6 +213,7 @@ func (h *Handler) probeLoopFile(w http.ResponseWriter, req StreamProbeRequest) {
 	probeCmd := exec.Command("ffprobe", "-v", "error", "-select_streams", "v:0",
 		"-show_entries", "stream=codec_name,width,height,r_frame_rate",
 		"-of", "csv=p=0", foundPath)
+	proc.SetHideWindow(probeCmd)
 	if out, err := probeCmd.Output(); err == nil {
 		parts := strings.Split(strings.TrimSpace(string(out)), ",")
 		if len(parts) >= 1 && parts[0] != "" {
@@ -228,6 +230,7 @@ func (h *Handler) probeLoopFile(w http.ResponseWriter, req StreamProbeRequest) {
 
 	var snapshotURI string
 	snapCmd := exec.Command("ffmpeg", "-ss", "00:00:01", "-i", foundPath, "-vframes", "1", "-q:v", "3", "-f", "image2pipe", "-c:v", "mjpeg", "pipe:1")
+	proc.SetHideWindow(snapCmd)
 	if snapBytes, err := snapCmd.Output(); err == nil && len(snapBytes) > 0 {
 		snapshotURI = fmt.Sprintf("data:image/jpeg;base64,%s", base64.StdEncoding.EncodeToString(snapBytes))
 	}
@@ -452,6 +455,7 @@ func (h *Handler) probeRTSP(w http.ResponseWriter, req StreamProbeRequest) {
 	tmpFile := filepath.Join("samples", fmt.Sprintf("probe_%d.jpg", time.Now().UnixNano()))
 	snapCmd := exec.Command(ffmpegBin, "-rtsp_transport", "tcp", "-timeout", "5000000",
 		"-i", targetURL, "-update", "1", "-frames:v", "1", "-q:v", "2", "-y", tmpFile)
+	proc.SetHideWindow(snapCmd)
 	out, errCmd := snapCmd.CombinedOutput()
 	outStr := string(out)
 
