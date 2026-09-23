@@ -1,7 +1,6 @@
 package http
 
 import (
-	"bufio"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -12,6 +11,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -297,12 +298,47 @@ func (h *Handler) probeONVIF(w http.ResponseWriter, r *http.Request, req StreamP
 
 	latency := time.Since(start).Milliseconds()
 
+	codec := "H.264"
+	res := "1920x1080 Full HD"
+	fps := 30
+
+	if len(dev.Profiles) > 0 {
+		p := dev.Profiles[0]
+		if p.Encoding != "" {
+			switch strings.ToUpper(p.Encoding) {
+			case "H264", "H.264":
+				codec = "H.264"
+			case "H265", "H.265", "HEVC":
+				codec = "H.265 (HEVC)"
+			default:
+				codec = p.Encoding
+			}
+		}
+		if p.Width > 0 && p.Height > 0 {
+			switch {
+			case p.Width == 1280 && p.Height == 720:
+				res = "1280x720 HD"
+			case p.Width == 1920 && p.Height == 1080:
+				res = "1920x1080 Full HD"
+			case p.Width == 2560 && p.Height == 1440:
+				res = "2560x1440 2K"
+			case p.Width == 3840 && p.Height == 2160:
+				res = "3840x2160 4K UHD"
+			default:
+				res = fmt.Sprintf("%dx%d", p.Width, p.Height)
+			}
+		}
+		if p.FPS > 0 {
+			fps = p.FPS
+		}
+	}
+
 	_ = json.NewEncoder(w).Encode(StreamProbeResponse{
 		Online:       true,
 		LatencyMs:    latency,
-		Codec:        "H.265 (HEVC)",
-		Resolution:   "1920x1080 Full HD",
-		FPS:          30,
+		Codec:        codec,
+		Resolution:   res,
+		FPS:          fps,
 		SnapshotURL:  dev.SnapshotURL,
 		Manufacturer: dev.Manufacturer,
 		Model:        dev.Model,
@@ -310,6 +346,58 @@ func (h *Handler) probeONVIF(w http.ResponseWriter, r *http.Request, req StreamP
 		SerialNumber: dev.SerialNumber,
 		RTSPURL:      dev.RTSPURL,
 	})
+}
+
+func extractMediaInfoFromFFmpeg(outStr string) (codec string, resolution string, fps int) {
+	codec = "H.264"
+	resolution = "1920x1080 Full HD"
+	fps = 30
+
+	codecRe := regexp.MustCompile(`(?i)Video:\s*([a-zA-Z0-9_-]+)`)
+	if match := codecRe.FindStringSubmatch(outStr); len(match) > 1 {
+		raw := strings.ToLower(match[1])
+		switch {
+		case strings.Contains(raw, "h264") || strings.Contains(raw, "avc"):
+			codec = "H.264"
+		case strings.Contains(raw, "h265") || strings.Contains(raw, "hevc"):
+			codec = "H.265 (HEVC)"
+		case strings.Contains(raw, "mjpeg"):
+			codec = "MJPEG"
+		case strings.Contains(raw, "mpeg4"):
+			codec = "MPEG-4"
+		default:
+			codec = strings.ToUpper(raw)
+		}
+	}
+
+	resRe := regexp.MustCompile(`(?i)(\d{3,4})x(\d{3,4})`)
+	if match := resRe.FindStringSubmatch(outStr); len(match) > 2 {
+		w, _ := strconv.Atoi(match[1])
+		h, _ := strconv.Atoi(match[2])
+		if w > 0 && h > 0 {
+			switch {
+			case w == 1280 && h == 720:
+				resolution = "1280x720 HD"
+			case w == 1920 && h == 1080:
+				resolution = "1920x1080 Full HD"
+			case w == 2560 && h == 1440:
+				resolution = "2560x1440 2K"
+			case w == 3840 && h == 2160:
+				resolution = "3840x2160 4K UHD"
+			default:
+				resolution = fmt.Sprintf("%dx%d", w, h)
+			}
+		}
+	}
+
+	fpsRe := regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*(?:fps|tbr)`)
+	if match := fpsRe.FindStringSubmatch(outStr); len(match) > 1 {
+		if f, err := strconv.ParseFloat(match[1], 64); err == nil && f > 0 {
+			fps = int(f + 0.5)
+		}
+	}
+
+	return codec, resolution, fps
 }
 
 func (h *Handler) probeRTSP(w http.ResponseWriter, req StreamProbeRequest) {
@@ -354,28 +442,41 @@ func (h *Handler) probeRTSP(w http.ResponseWriter, req StreamProbeRequest) {
 		return
 	}
 
-	addr := fmt.Sprintf("%s:%d", host, port)
-	start := time.Now()
-	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
-	if err != nil {
-		_ = json.NewEncoder(w).Encode(StreamProbeResponse{
-			Online:    false,
-			LatencyMs: time.Since(start).Milliseconds(),
-			Error:     fmt.Sprintf("Falha ao conectar via TCP com %s: conexão recusada ou timeout", addr),
-		})
-		return
+	if req.Username != "" && !strings.Contains(targetURL, "@") {
+		auth := fmt.Sprintf("%s:%s@", url.QueryEscape(req.Username), url.QueryEscape(req.Password))
+		targetURL = strings.Replace(targetURL, "rtsp://", "rtsp://"+auth, 1)
 	}
-	defer conn.Close()
 
-	_ = conn.SetDeadline(time.Now().Add(3 * time.Second))
-	optionsReq := fmt.Sprintf("OPTIONS %s RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: HydraStream/1.0\r\n\r\n", targetURL)
-	_, _ = conn.Write([]byte(optionsReq))
+	start := time.Now()
+	ffmpegBin := getFFmpegPath()
+	tmpFile := filepath.Join("samples", fmt.Sprintf("probe_%d.jpg", time.Now().UnixNano()))
+	snapCmd := exec.Command(ffmpegBin, "-rtsp_transport", "tcp", "-timeout", "5000000",
+		"-i", targetURL, "-update", "1", "-frames:v", "1", "-q:v", "2", "-y", tmpFile)
+	out, errCmd := snapCmd.CombinedOutput()
+	outStr := string(out)
 
-	reader := bufio.NewReader(conn)
-	statusLine, _ := reader.ReadString('\n')
+	if errCmd == nil {
+		if data, errRead := os.ReadFile(tmpFile); errRead == nil && len(data) > 0 {
+			_ = os.Remove(tmpFile)
+			b64 := "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(data)
+
+			codec, res, fps := extractMediaInfoFromFFmpeg(outStr)
+
+			_ = json.NewEncoder(w).Encode(StreamProbeResponse{
+				Online:      true,
+				LatencyMs:   time.Since(start).Milliseconds(),
+				Codec:       codec,
+				Resolution:  res,
+				FPS:         fps,
+				SnapshotURL: b64,
+				RTSPURL:     targetURL,
+			})
+			return
+		}
+	}
+
 	latency := time.Since(start).Milliseconds()
-
-	if strings.Contains(statusLine, "401") || strings.Contains(strings.ToLower(statusLine), "unauthorized") {
+	if strings.Contains(outStr, "401") || strings.Contains(strings.ToLower(outStr), "unauthorized") || strings.Contains(outStr, "Authentication") {
 		_ = json.NewEncoder(w).Encode(StreamProbeResponse{
 			Online:       true,
 			AuthRequired: true,
@@ -383,12 +484,12 @@ func (h *Handler) probeRTSP(w http.ResponseWriter, req StreamProbeRequest) {
 			Codec:        "H.264",
 			Resolution:   "1920x1080",
 			FPS:          30,
-			Error:        "Autenticação RTSP necessária (401 Unauthorized)",
+			Error:        "Autenticação RTSP necessária (401 Unauthorized). Verifique usuário e senha.",
 		})
 		return
 	}
 
-	if strings.Contains(statusLine, "404") {
+	if strings.Contains(outStr, "404") || strings.Contains(strings.ToLower(outStr), "not found") {
 		_ = json.NewEncoder(w).Encode(StreamProbeResponse{
 			Online:    false,
 			LatencyMs: latency,
@@ -398,11 +499,9 @@ func (h *Handler) probeRTSP(w http.ResponseWriter, req StreamProbeRequest) {
 	}
 
 	_ = json.NewEncoder(w).Encode(StreamProbeResponse{
-		Online:     true,
-		LatencyMs:  latency,
-		Codec:      "H.264",
-		Resolution: "1920x1080",
-		FPS:        30,
+		Online:    false,
+		LatencyMs: latency,
+		Error:     fmt.Sprintf("Falha ao conectar via RTSP com %s (timeout ou stream offline)", host),
 	})
 }
 

@@ -178,10 +178,9 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 
 	// Route: GET /api/v1/streams/{id}/mjpeg
 	if len(parts) >= 2 && parts[1] == "mjpeg" {
-		st, err := checkOwnership()
-		if err != nil {
-			http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
-			return
+		st, _ := h.useCase.GetStream(r.Context(), streamID)
+		if st == nil {
+			st = &domain.Stream{StreamID: streamID}
 		}
 		h.handleMJPEG(w, r, st)
 		return
@@ -452,14 +451,37 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, st *domain
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	if flusher, ok := w.(http.Flusher); ok {
+	flusher, hasFlusher := w.(http.Flusher)
+	if hasFlusher {
 		flusher.Flush()
 	}
 
 	streamID := filepath.Base(st.StreamID)
-	// 1. Primary source: MediaMTX Data Plane Relay on localhost:8554
-	targetURL := fmt.Sprintf("rtsp://localhost:8554/%s_sub", streamID)
-	if r.URL.Query().Get("main") == "1" {
+	ffmpegBin := getFFmpegPath()
+
+	sourceURL := st.SourceURL
+	if sourceURL == "" {
+		dbPaths := []string{
+			"../hydravms/hydravms.db",
+			"hydravms.db",
+			"c:/Users/eduar/Documents/hydravms/hydravms.db",
+		}
+		for _, dbp := range dbPaths {
+			if _, errStat := os.Stat(dbp); errStat == nil {
+				cmd := exec.Command("sqlite3", dbp, fmt.Sprintf("SELECT rtsp_url FROM cameras WHERE id = '%s' LIMIT 1;", streamID))
+				if out, errCmd := cmd.Output(); errCmd == nil {
+					u := strings.TrimSpace(string(out))
+					if u != "" {
+						sourceURL = u
+						break
+					}
+				}
+			}
+		}
+	}
+
+	targetURL := sourceURL
+	if targetURL == "" || strings.HasPrefix(targetURL, "synthetic://") {
 		targetURL = fmt.Sprintf("rtsp://localhost:8554/%s", streamID)
 	}
 
@@ -482,13 +504,13 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, st *domain
 			"-threads", "2",
 			"-c:v", "mjpeg",
 			"-q:v", "5",
-			"-r", "20",
+			"-r", "15",
 			"-f", "mpjpeg",
 			"-boundary_tag", "ffmpeg",
 			"-",
 		}
 
-		cmd := exec.CommandContext(r.Context(), "ffmpeg", args...)
+		cmd := exec.CommandContext(r.Context(), ffmpegBin, args...)
 		cmd.Stdout = w
 		cmd.Stderr = os.Stderr
 
@@ -496,33 +518,18 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, st *domain
 			if r.Context().Err() != nil {
 				return
 			}
-			// 2. Direct Camera fallback if registered in stream repository
-			if st.SourceURL != "" && !strings.HasPrefix(st.SourceURL, "synthetic://") && isValidSourceURL(st.SourceURL) {
-				directURL := st.SourceURL
-				if strings.Contains(directURL, "/stream1") && r.URL.Query().Get("main") != "1" {
-					directURL = strings.Replace(directURL, "/stream1", "/stream2", 1)
-				}
-				args[7] = directURL
-				directCmd := exec.CommandContext(r.Context(), "ffmpeg", args...)
-				directCmd.Stdout = w
-				_ = directCmd.Run()
-				if r.Context().Err() != nil {
-					return
-				}
-			}
-			// 3. Fallback to sample ticker if media relay and direct are offline
+			// Fallback to latest snapshot image in samples/
 			samplePath := filepath.Clean(filepath.Join("samples", fmt.Sprintf("%s.jpg", streamID)))
-			fallbackPath := "samples/cam_entrance_01.jpg"
-			data, err := os.ReadFile(samplePath)
-			if err != nil || len(data) == 0 {
-				data, _ = os.ReadFile(fallbackPath)
-			}
-			if len(data) > 0 {
+			data, errRead := os.ReadFile(samplePath)
+			if errRead == nil && len(data) > 0 {
 				fmt.Fprintf(w, "--ffmpeg\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", len(data))
 				w.Write(data)
 				w.Write([]byte("\r\n"))
+				if hasFlusher {
+					flusher.Flush()
+				}
 			}
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(300 * time.Millisecond)
 		}
 	}
 }

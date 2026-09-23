@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -113,6 +114,56 @@ func (s *StreamService) SetWHEPBaseURL(url string) {
 }
 
 
+func syncMediaMTXPath(streamID, sourceURL string) {
+	if streamID == "" || sourceURL == "" {
+		return
+	}
+	client := &http.Client{Timeout: 2 * time.Second}
+	body, _ := json.Marshal(map[string]interface{}{
+		"source":         sourceURL,
+		"sourceOnDemand": true,
+	})
+
+	for _, name := range []string{streamID, streamID + "_sub"} {
+		req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9997/v3/config/paths/add/%s", name), bytes.NewReader(body))
+		if err == nil {
+			req.Header.Set("Content-Type", "application/json")
+			resp, errDo := client.Do(req)
+			if errDo == nil && resp != nil {
+				if resp.StatusCode == http.StatusBadRequest {
+					_ = resp.Body.Close()
+					reqPatch, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9997/v3/config/paths/patch/%s", name), bytes.NewReader(body))
+					if reqPatch != nil {
+						reqPatch.Header.Set("Content-Type", "application/json")
+						respPatch, errPatch := client.Do(reqPatch)
+						if errPatch == nil && respPatch != nil {
+							_ = respPatch.Body.Close()
+						}
+					}
+				} else {
+					_ = resp.Body.Close()
+				}
+			}
+		}
+	}
+}
+
+func deleteMediaMTXPath(streamID string) {
+	if streamID == "" {
+		return
+	}
+	client := &http.Client{Timeout: 2 * time.Second}
+	for _, name := range []string{streamID, streamID + "_sub"} {
+		req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9997/v3/config/paths/delete/%s", name), nil)
+		if req != nil {
+			resp, err := client.Do(req)
+			if err == nil && resp != nil {
+				_ = resp.Body.Close()
+			}
+		}
+	}
+}
+
 func (s *StreamService) RegisterStream(ctx context.Context, stream *domain.Stream) error {
 	if err := stream.Validate(); err != nil {
 		s.RecordLog(domain.LogLevelWarn, "validation", fmt.Sprintf("Stream validation failed: %v", err), nil)
@@ -128,6 +179,7 @@ func (s *StreamService) RegisterStream(ctx context.Context, stream *domain.Strea
 			return err
 		}
 	}
+	go syncMediaMTXPath(stream.StreamID, stream.SourceURL)
 	s.RecordLog(domain.LogLevelInfo, "stream", fmt.Sprintf("Stream '%s' registered successfully (Codec: %s, Ingest FPS: %.1f)", stream.StreamID, stream.Codec, stream.IngestFPS), nil)
 	return nil
 }
@@ -150,6 +202,7 @@ func (s *StreamService) DeleteStream(ctx context.Context, streamID string) error
 	if s.ingestor != nil {
 		_ = s.ingestor.StopIngest(ctx, streamID)
 	}
+	go deleteMediaMTXPath(streamID)
 	s.RecordLog(domain.LogLevelInfo, "stream", fmt.Sprintf("Stream '%s' unregistered and ingest stopped", streamID), nil)
 	return s.repo.Delete(ctx, streamID)
 }
