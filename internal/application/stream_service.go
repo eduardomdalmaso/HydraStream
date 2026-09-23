@@ -114,17 +114,28 @@ func (s *StreamService) SetWHEPBaseURL(url string) {
 }
 
 
-func syncMediaMTXPath(streamID, sourceURL string) {
+func syncMediaMTXPath(streamID, sourceURL, codec string) {
 	if streamID == "" || sourceURL == "" {
 		return
 	}
 	client := &http.Client{Timeout: 2 * time.Second}
-	body, _ := json.Marshal(map[string]interface{}{
-		"source":         sourceURL,
-		"sourceOnDemand": true,
-	})
+	isH265 := strings.Contains(strings.ToUpper(codec), "265") || strings.Contains(strings.ToUpper(codec), "HEVC")
 
 	for _, name := range []string{streamID, streamID + "_sub"} {
+		var payload map[string]interface{}
+		if isH265 {
+			payload = map[string]interface{}{
+				"runOnDemand":        fmt.Sprintf("./bin/silent_ffmpeg.exe -rtsp_transport tcp -i \"%s\" -c:v libx264 -preset ultrafast -tune zerolatency -b:v 1500k -f rtsp rtsp://127.0.0.1:8554/%s", sourceURL, name),
+				"runOnDemandRestart": true,
+			}
+		} else {
+			payload = map[string]interface{}{
+				"source":         sourceURL,
+				"sourceOnDemand": true,
+			}
+		}
+		body, _ := json.Marshal(payload)
+
 		req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9997/v3/config/paths/add/%s", name), bytes.NewReader(body))
 		if err == nil {
 			req.Header.Set("Content-Type", "application/json")
@@ -179,7 +190,7 @@ func (s *StreamService) RegisterStream(ctx context.Context, stream *domain.Strea
 			return err
 		}
 	}
-	go syncMediaMTXPath(stream.StreamID, stream.SourceURL)
+	go syncMediaMTXPath(stream.StreamID, stream.SourceURL, stream.Codec)
 	s.RecordLog(domain.LogLevelInfo, "stream", fmt.Sprintf("Stream '%s' registered successfully (Codec: %s, Ingest FPS: %.1f)", stream.StreamID, stream.Codec, stream.IngestFPS), nil)
 	return nil
 }
