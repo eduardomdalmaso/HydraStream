@@ -33,9 +33,26 @@ func isPortInUse(port string) bool {
 }
 
 func startEmbeddedMediaMTX() *exec.Cmd {
-	binPath := "./bin/mediamtx"
-	if _, err := os.Stat(binPath); err != nil {
-		log.Printf("⚠️ [HydraStream] MediaMTX binary not found at %s. Skipping embedded start.\n", binPath)
+	candidates := []string{
+		"./bin/mediamtx.exe",
+		"./bin/mediamtx",
+		"./mediamtx.exe",
+		"mediamtx.exe",
+		"mediamtx",
+	}
+	binPath := ""
+	for _, c := range candidates {
+		if p, err := exec.LookPath(c); err == nil {
+			binPath = p
+			break
+		}
+		if _, err := os.Stat(c); err == nil {
+			binPath = c
+			break
+		}
+	}
+	if binPath == "" {
+		log.Printf("⚠️ [HydraStream] MediaMTX binary not found. Skipping embedded start.\n")
 		return nil
 	}
 

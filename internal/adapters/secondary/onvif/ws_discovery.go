@@ -201,6 +201,13 @@ func parseProbeMatch(xmlData, srcAddr string) *domain.ONVIFDevice {
 	}
 
 	ip := u.Hostname()
+	if ip == "" && srcAddr != "" {
+		if host, _, err := net.SplitHostPort(srcAddr); err == nil {
+			ip = host
+		} else {
+			ip = srcAddr
+		}
+	}
 	port := 80
 	if u.Port() != "" {
 		if p, err := strconv.Atoi(u.Port()); err == nil {

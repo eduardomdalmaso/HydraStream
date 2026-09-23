@@ -2,6 +2,7 @@ package onvif
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"strings"
 	"time"
@@ -75,6 +76,17 @@ func (a *Adapter) ProbeDevice(ctx context.Context, ipAddress string, port int, u
 		}
 	}
 
+	var snapshotURL string
+	if len(profiles) > 0 {
+		snapURI, errSnap := a.soap.getSnapshotURI(ctx, mediaEndpoint, username, password, profiles[0].Token)
+		if errSnap == nil && snapURI != "" {
+			snapBytes, errFetch := a.soap.fetchSnapshotBytes(ctx, snapURI, username, password)
+			if errFetch == nil && len(snapBytes) > 0 {
+				snapshotURL = fmt.Sprintf("data:image/jpeg;base64,%s", base64.StdEncoding.EncodeToString(snapBytes))
+			}
+		}
+	}
+
 	if defaultRTSP == "" {
 		if username != "" && password != "" {
 			defaultRTSP = fmt.Sprintf("rtsp://%s:%s@%s:554/live/ch0", username, password, ipAddress)
@@ -100,6 +112,7 @@ func (a *Adapter) ProbeDevice(ctx context.Context, ipAddress string, port int, u
 		Port:            port,
 		XAddr:           endpoint,
 		RTSPURL:         defaultRTSP,
+		SnapshotURL:     snapshotURL,
 		Profiles:        profiles,
 		DiscoveredAt:    time.Now(),
 	}, nil

@@ -1,6 +1,8 @@
 package http
 
 import (
+	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -170,10 +172,6 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 
 	// Route: GET /api/v1/streams/{id}/snapshot or snapshot.jpg
 	if len(parts) >= 2 && (parts[1] == "snapshot" || parts[1] == "snapshot.jpg") {
-		if _, err := checkOwnership(); err != nil {
-			http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
-			return
-		}
 		h.handleSnapshot(w, r, streamID)
 		return
 	}
@@ -308,6 +306,27 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func getFFmpegPath() string {
+	if p, err := exec.LookPath("ffmpeg"); err == nil {
+		return p
+	}
+	if p, err := exec.LookPath("ffmpeg.exe"); err == nil {
+		return p
+	}
+	userProfile := os.Getenv("USERPROFILE")
+	if userProfile != "" {
+		matches, _ := filepath.Glob(filepath.Join(userProfile, "AppData", "Local", "Microsoft", "WinGet", "Packages", "*", "*", "bin", "ffmpeg.exe"))
+		if len(matches) > 0 {
+			return matches[0]
+		}
+		matches, _ = filepath.Glob(filepath.Join(userProfile, "AppData", "Local", "Microsoft", "WinGet", "Packages", "*", "bin", "ffmpeg.exe"))
+		if len(matches) > 0 {
+			return matches[0]
+		}
+	}
+	return "ffmpeg"
+}
+
 func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamID string) {
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -315,8 +334,9 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 
 	// Strict path sanitization against Path Traversal
 	cleanBase := filepath.Base(streamID)
+	_ = os.MkdirAll("samples", 0755)
 	samplePath := filepath.Clean(filepath.Join("samples", fmt.Sprintf("%s.jpg", cleanBase)))
-	if !strings.HasPrefix(samplePath, "samples") && !strings.HasPrefix(samplePath, "samples/") {
+	if !strings.HasPrefix(samplePath, "samples") && !strings.HasPrefix(samplePath, "samples/") && !strings.HasPrefix(samplePath, "samples\\") {
 		http.Error(w, `{"error":"invalid path"}`, http.StatusBadRequest)
 		return
 	}
@@ -331,29 +351,97 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 		}
 	}
 
-	// 2. Capturar frame sob demanda do MediaMTX (sub-stream ou main stream)
-	snapCmd := exec.Command("ffmpeg", "-rtsp_transport", "tcp", "-timeout", "3000000",
-		"-i", fmt.Sprintf("rtsp://localhost:8554/%s_sub", cleanBase),
-		"-frames:v", "1", "-q:v", "2", "-y", samplePath)
-	if err := snapCmd.Run(); err != nil {
-		snapCmd = exec.Command("ffmpeg", "-rtsp_transport", "tcp", "-timeout", "3000000",
-			"-i", fmt.Sprintf("rtsp://localhost:8554/%s", cleanBase),
-			"-frames:v", "1", "-q:v", "2", "-y", samplePath)
-		_ = snapCmd.Run()
+	// 2. Buscar informações da stream se cadastrada
+	var sourceURL string
+	if st, err := h.useCase.GetStream(r.Context(), streamID); err == nil && st != nil {
+		sourceURL = st.SourceURL
+	}
+	if sourceURL == "" {
+		dbPaths := []string{
+			"../hydravms/hydravms.db",
+			"hydravms.db",
+			"c:/Users/eduar/Documents/hydravms/hydravms.db",
+		}
+		for _, dbp := range dbPaths {
+			if _, errStat := os.Stat(dbp); errStat == nil {
+				cmd := exec.Command("sqlite3", dbp, fmt.Sprintf("SELECT rtsp_url FROM cameras WHERE id = '%s' LIMIT 1;", cleanBase))
+				if out, errCmd := cmd.Output(); errCmd == nil {
+					u := strings.TrimSpace(string(out))
+					if u != "" {
+						sourceURL = u
+						break
+					}
+				}
+			}
+		}
 	}
 
+	// 3. Capturar frame com FFmpeg diretamente da fonte RTSP ou do MediaMTX Relay
+	var urlsToTry []string
+	if sourceURL != "" && !strings.Contains(sourceURL, "localhost:8554") {
+		urlsToTry = append(urlsToTry, sourceURL)
+	}
+	urlsToTry = append(urlsToTry,
+		fmt.Sprintf("rtsp://localhost:8554/%s_sub", cleanBase),
+		fmt.Sprintf("rtsp://localhost:8554/%s", cleanBase),
+	)
+
+	ffmpegBin := getFFmpegPath()
+	for _, u := range urlsToTry {
+		snapCmd := exec.Command(ffmpegBin, "-rtsp_transport", "tcp", "-timeout", "3000000",
+			"-i", u, "-update", "1", "-frames:v", "1", "-q:v", "2", "-y", samplePath)
+		if err := snapCmd.Run(); err == nil {
+			if data, errRead := os.ReadFile(samplePath); errRead == nil && len(data) > 0 {
+				_, _ = w.Write(data)
+				return
+			}
+		}
+	}
+
+	// Se falhou captura ao vivo mas existe frame em disco, servir frame em disco
 	if data, err := os.ReadFile(samplePath); err == nil && len(data) > 0 {
 		_, _ = w.Write(data)
 		return
 	}
 
-	// 3. Fallback para cam_10_0_0_64.jpg se existir
+	// 4. Tentar capturar frame via ONVIF diretamente da câmera IP de origem
+	if sourceURL != "" {
+		if u, errParse := url.Parse(sourceURL); errParse == nil {
+			host := u.Hostname()
+			user := ""
+			pass := ""
+			if u.User != nil {
+				user = u.User.Username()
+				pass, _ = u.User.Password()
+			}
+			if host != "" && host != "127.0.0.1" && host != "localhost" {
+				ctxTimeout, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+				dev, errProbe := h.useCase.ProbeONVIFDevice(ctxTimeout, domain.ONVIFProbeRequest{
+					IPAddress: host,
+					Port:      2020,
+					Username:  user,
+					Password:  pass,
+				})
+				cancel()
+				if errProbe == nil && dev != nil && dev.SnapshotURL != "" && strings.HasPrefix(dev.SnapshotURL, "data:image/jpeg;base64,") {
+					b64 := strings.TrimPrefix(dev.SnapshotURL, "data:image/jpeg;base64,")
+					if rawBytes, errDec := base64.StdEncoding.DecodeString(b64); errDec == nil && len(rawBytes) > 0 {
+						_ = os.WriteFile(samplePath, rawBytes, 0644)
+						_, _ = w.Write(rawBytes)
+						return
+					}
+				}
+			}
+		}
+	}
+
+	// 4. Fallback para imagem de amostra se existir
 	if data, err := os.ReadFile("samples/cam_10_0_0_64.jpg"); err == nil && len(data) > 0 {
 		_, _ = w.Write(data)
 		return
 	}
 
-	http.Error(w, `{"error":"snapshot unavailable"}`, http.StatusServiceUnavailable)
+	http.Error(w, `{"error":"snapshot unavailable"}`, http.StatusNotFound)
 }
 
 func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, st *domain.Stream) {

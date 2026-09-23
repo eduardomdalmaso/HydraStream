@@ -3,6 +3,7 @@ package onvif
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/base64"
@@ -193,6 +194,126 @@ func (s *soapClient) getStreamURI(ctx context.Context, mediaEndpoint, user, pass
 		}
 	}
 	return rawURI, nil
+}
+
+func (s *soapClient) getSnapshotURI(ctx context.Context, mediaEndpoint, user, pass, profileToken string) (string, error) {
+	body := fmt.Sprintf(`
+    <trt:GetSnapshotUri>
+      <trt:ProfileToken>%s</trt:ProfileToken>
+    </trt:GetSnapshotUri>`, profileToken)
+
+	resp, err := s.call(ctx, mediaEndpoint, "http://www.onvif.org/ver10/media/wsdl/GetSnapshotUri", user, pass, body)
+	if err != nil {
+		return "", err
+	}
+
+	rawURI := extractTag(resp, "Uri")
+	if rawURI == "" {
+		return "", fmt.Errorf("no snapshot uri returned in SOAP response")
+	}
+	return rawURI, nil
+}
+
+func (s *soapClient) fetchSnapshotBytes(ctx context.Context, snapshotURL, user, pass string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", snapshotURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	if user != "" && pass != "" {
+		req.SetBasicAuth(user, pass)
+	}
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// If 401 and Digest Auth is requested
+	if resp.StatusCode == http.StatusUnauthorized && user != "" && pass != "" {
+		authHeader := resp.Header.Get("WWW-Authenticate")
+		if strings.HasPrefix(strings.ToLower(authHeader), "digest") {
+			digestAuth := buildDigestAuthHeader(authHeader, "GET", snapshotURL, user, pass)
+			if digestAuth != "" {
+				req2, err2 := http.NewRequestWithContext(ctx, "GET", snapshotURL, nil)
+				if err2 == nil {
+					req2.Header.Set("Authorization", digestAuth)
+					resp2, err3 := s.client.Do(req2)
+					if err3 == nil {
+						defer resp2.Body.Close()
+						if resp2.StatusCode == http.StatusOK {
+							return io.ReadAll(resp2.Body)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("snapshot request returned HTTP %d", resp.StatusCode)
+	}
+
+	return io.ReadAll(resp.Body)
+}
+
+func buildDigestAuthHeader(authHeader, method, rawURL, user, pass string) string {
+	realm := extractDigestParam(authHeader, "realm")
+	nonce := extractDigestParam(authHeader, "nonce")
+	qop := extractDigestParam(authHeader, "qop")
+	opaque := extractDigestParam(authHeader, "opaque")
+
+	u, err := url.Parse(rawURL)
+	uri := "/"
+	if err == nil {
+		uri = u.RequestURI()
+	}
+
+	ha1 := fmt.Sprintf("%x", sha1OrMD5(fmt.Sprintf("%s:%s:%s", user, realm, pass)))
+	ha2 := fmt.Sprintf("%x", sha1OrMD5(fmt.Sprintf("%s:%s", method, uri)))
+
+	nc := "00000001"
+	cnonce := fmt.Sprintf("%x", time.Now().UnixNano())
+
+	var response string
+	if strings.Contains(qop, "auth") {
+		response = fmt.Sprintf("%x", sha1OrMD5(fmt.Sprintf("%s:%s:%s:%s:auth:%s", ha1, nonce, nc, cnonce, ha2)))
+		header := fmt.Sprintf(`Digest username="%s", realm="%s", nonce="%s", uri="%s", response="%s", qop=auth, nc=%s, cnonce="%s"`,
+			user, realm, nonce, uri, response, nc, cnonce)
+		if opaque != "" {
+			header += fmt.Sprintf(`, opaque="%s"`, opaque)
+		}
+		return header
+	}
+
+	response = fmt.Sprintf("%x", sha1OrMD5(fmt.Sprintf("%s:%s:%s", ha1, nonce, ha2)))
+	header := fmt.Sprintf(`Digest username="%s", realm="%s", nonce="%s", uri="%s", response="%s"`,
+		user, realm, nonce, uri, response)
+	if opaque != "" {
+		header += fmt.Sprintf(`, opaque="%s"`, opaque)
+	}
+	return header
+}
+
+func sha1OrMD5(data string) [16]byte {
+	return md5Sum(data)
+}
+
+func md5Sum(data string) [16]byte {
+	return md5.Sum([]byte(data))
+}
+
+func md5Wrapper(b []byte) [16]byte {
+	return md5.Sum(b)
+}
+
+func extractDigestParam(header, key string) string {
+	re := regexp.MustCompile(fmt.Sprintf(`%s="?([^",]+)"?`, key))
+	m := re.FindStringSubmatch(header)
+	if len(m) >= 2 {
+		return m[1]
+	}
+	return ""
 }
 
 func extractTag(xmlStr, tagName string) string {

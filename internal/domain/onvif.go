@@ -26,6 +26,7 @@ type ONVIFDevice struct {
 	Port            int            `json:"port"`
 	XAddr           string         `json:"xaddr"`           // e.g., "http://192.168.1.100:80/onvif/device_service"
 	RTSPURL         string         `json:"rtsp_url"`        // Default RTSP stream URL
+	SnapshotURL     string         `json:"snapshot_url,omitempty"`
 	Profiles        []ONVIFProfile `json:"profiles"`
 	DiscoveredAt    time.Time      `json:"discovered_at"`
 }

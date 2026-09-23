@@ -296,7 +296,6 @@ func (h *Handler) probeONVIF(w http.ResponseWriter, r *http.Request, req StreamP
 	}
 
 	latency := time.Since(start).Milliseconds()
-	snapURI := generateLiveHUDSnapshot(dev.Name, ip, port, "H.265 (HEVC)", "1920x1080 Full HD", 30, latency)
 
 	_ = json.NewEncoder(w).Encode(StreamProbeResponse{
 		Online:       true,
@@ -304,57 +303,13 @@ func (h *Handler) probeONVIF(w http.ResponseWriter, r *http.Request, req StreamP
 		Codec:        "H.265 (HEVC)",
 		Resolution:   "1920x1080 Full HD",
 		FPS:          30,
-		SnapshotURL:  snapURI,
+		SnapshotURL:  dev.SnapshotURL,
 		Manufacturer: dev.Manufacturer,
 		Model:        dev.Model,
 		Firmware:     dev.FirmwareVersion,
 		SerialNumber: dev.SerialNumber,
 		RTSPURL:      dev.RTSPURL,
 	})
-}
-
-func generateLiveHUDSnapshot(cameraName, ip string, port int, codec, resolution string, fps int, latencyMs int64) string {
-	svg := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360">
-		<defs>
-			<linearGradient id="hud_bg" x1="0" y1="0" x2="1" y2="1">
-				<stop offset="0%%" stop-color="#05070c"/>
-				<stop offset="100%%" stop-color="#0b111c"/>
-			</linearGradient>
-			<pattern id="hud_grid" width="32" height="32" patternUnits="userSpaceOnUse">
-				<path d="M 32 0 L 0 0 0 32" fill="none" stroke="rgba(0, 240, 255, 0.06)" stroke-width="1"/>
-			</pattern>
-		</defs>
-		<rect width="640" height="360" fill="url(#hud_bg)"/>
-		<rect width="640" height="360" fill="url(#hud_grid)"/>
-		<rect x="12" y="12" width="616" height="336" fill="none" stroke="rgba(0, 240, 255, 0.35)" stroke-width="1.5" rx="4"/>
-		
-		<path d="M 20 40 L 20 20 L 40 20" fill="none" stroke="#00f0ff" stroke-width="3"/>
-		<path d="M 600 20 L 620 20 L 620 40" fill="none" stroke="#00f0ff" stroke-width="3"/>
-		<path d="M 20 320 L 20 340 L 40 340" fill="none" stroke="#00f0ff" stroke-width="3"/>
-		<path d="M 600 340 L 620 340 L 620 320" fill="none" stroke="#00f0ff" stroke-width="3"/>
-
-		<circle cx="320" cy="180" r="48" fill="none" stroke="rgba(0, 240, 255, 0.3)" stroke-width="1" stroke-dasharray="4 4"/>
-		<circle cx="320" cy="180" r="5" fill="#00ff9d"/>
-		<line x1="260" y1="180" x2="300" y2="180" stroke="#00f0ff" stroke-width="1.5"/>
-		<line x1="340" y1="180" x2="380" y2="180" stroke="#00f0ff" stroke-width="1.5"/>
-		<line x1="320" y1="120" x2="320" y2="160" stroke="#00f0ff" stroke-width="1.5"/>
-		<line x1="320" y1="200" x2="320" y2="240" stroke="#00f0ff" stroke-width="1.5"/>
-
-		<circle cx="32" cy="34" r="5" fill="#00ff9d"/>
-		<text x="44" y="38" fill="#00ff9d" font-family="monospace" font-size="12" font-weight="bold">LIVE // SINAL ONVIF/RTSP ATIVO</text>
-		<text x="460" y="38" fill="#ff5e3a" font-family="monospace" font-size="11">STREAM ONLINE</text>
-
-		<text x="32" y="72" fill="#ffffff" font-family="sans-serif" font-size="18" font-weight="bold">%s</text>
-		<text x="32" y="92" fill="#00f0ff" font-family="monospace" font-size="12">TARGET // %s:%d</text>
-
-		<rect x="20" y="300" width="600" height="32" fill="rgba(0, 0, 0, 0.65)" rx="3"/>
-		<text x="32" y="321" fill="#8b94a0" font-family="monospace" font-size="11">CODEC: <tspan fill="#ffffff" font-weight="bold">%s</tspan></text>
-		<text x="180" y="321" fill="#8b94a0" font-family="monospace" font-size="11">RES: <tspan fill="#ffffff" font-weight="bold">%s</tspan></text>
-		<text x="360" y="321" fill="#8b94a0" font-family="monospace" font-size="11">FPS: <tspan fill="#ffffff" font-weight="bold">%d FPS</tspan></text>
-		<text x="500" y="321" fill="#8b94a0" font-family="monospace" font-size="11">PING: <tspan fill="#00f0ff" font-weight="bold">%dms</tspan></text>
-	</svg>`, cameraName, ip, port, codec, resolution, fps, latencyMs)
-
-	return fmt.Sprintf("data:image/svg+xml;base64,%s", base64.StdEncoding.EncodeToString([]byte(svg)))
 }
 
 func (h *Handler) probeRTSP(w http.ResponseWriter, req StreamProbeRequest) {
@@ -442,15 +397,12 @@ func (h *Handler) probeRTSP(w http.ResponseWriter, req StreamProbeRequest) {
 		return
 	}
 
-	snapURI := generateLiveHUDSnapshot("Fluxo RTSP", host, port, "H.264", "1920x1080", 30, latency)
-
 	_ = json.NewEncoder(w).Encode(StreamProbeResponse{
-		Online:      true,
-		LatencyMs:   latency,
-		Codec:       "H.264",
-		Resolution:  "1920x1080",
-		FPS:         30,
-		SnapshotURL: snapURI,
+		Online:     true,
+		LatencyMs:  latency,
+		Codec:      "H.264",
+		Resolution: "1920x1080",
+		FPS:        30,
 	})
 }
 
