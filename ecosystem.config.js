@@ -11,6 +11,7 @@ module.exports = {
       restart_delay: 2000,
       env: {
         PORT: "8080",
+        JWT_SECRET: "hydravms-enterprise-secure-jwt-signing-key-32b-secret",
       },
     },
 
@@ -26,6 +27,7 @@ module.exports = {
       env: {
         PORT: "8081",
         CUDA_VISIBLE_DEVICES: "0",
+        JWT_SECRET: "hydravms-enterprise-secure-jwt-signing-key-32b-secret",
       },
     },
 
