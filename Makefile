@@ -1,19 +1,31 @@
 # HydraStream Development & Build Automation Makefile
 
-.PHONY: dev dev-all build test cargo-test benchmark mediamtx stream-sample clean help
+.PHONY: dev dev-all build test cargo-test benchmark mediamtx deps-mediamtx stream-sample clean help
 
 # Default target
 all: dev
 
+# Ensure MediaMTX binary is installed
+deps-mediamtx:
+	@if [ ! -f ./bin/mediamtx ] && [ ! -f ./bin/mediamtx.exe ]; then \
+		echo "📥 Downloading MediaMTX v1.21.1 for Linux amd64..."; \
+		mkdir -p bin; \
+		curl -fsSL -L "https://github.com/bluenviron/mediamtx/releases/download/v1.21.1/mediamtx_v1.21.1_linux_amd64.tar.gz" -o /tmp/mediamtx.tar.gz && \
+		tar -xzf /tmp/mediamtx.tar.gz -C bin/ mediamtx mediamtx.yml && \
+		[ -f mediamtx.yml ] || cp bin/mediamtx.yml ./mediamtx.yml && \
+		chmod +x bin/mediamtx && \
+		echo "✅ MediaMTX installed in bin/mediamtx"; \
+	fi
+
 # Run HydraStream in Live Development Mode
-dev:
+dev: deps-mediamtx
 	@echo "🚀 Starting HydraStream Data Plane Engine..."
 	@echo "📡 REST API & Telemetry endpoints active on port 8080"
 	go run ./cmd/hydrastream
 
 # Run MediaMTX RTSP Server binary
-mediamtx:
-	@echo "📡 Starting MediaMTX RTSP Server (v1.20.1) on ports 8554 (RTSP), 1935 (RTMP), 8888 (HLS), 8889 (WebRTC)..."
+mediamtx: deps-mediamtx
+	@echo "📡 Starting MediaMTX RTSP Server (v1.21.1) on ports 8554 (RTSP), 1935 (RTMP), 8888 (HLS), 8889 (WebRTC)..."
 	./bin/mediamtx
 
 # Publish a sample RTSP test feed to MediaMTX
@@ -22,7 +34,7 @@ stream-sample:
 	ffmpeg -re -f lavfi -i testsrc=size=1920x1080:rate=30 -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -f rtsp rtsp://localhost:8554/tenant_company_alpha/cam_entrance_01
 
 # Build final production binary and Rust data plane
-build:
+build: deps-mediamtx
 	@echo "📦 Building Rust Data Plane Engine..."
 	cargo build --release --manifest-path crates/hydra-engine/Cargo.toml
 	@echo "📦 Building Go Control Plane binary in bin/hydrastream..."
