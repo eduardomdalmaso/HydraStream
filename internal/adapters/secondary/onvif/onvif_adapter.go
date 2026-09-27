@@ -1,9 +1,12 @@
 package onvif
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -29,6 +32,31 @@ func (a *Adapter) Discover(ctx context.Context, timeout time.Duration) ([]domain
 		timeout = 2500 * time.Millisecond
 	}
 	return performWSDiscovery(ctx, timeout)
+}
+
+func captureSnapshotFromRTSP(ctx context.Context, rtspURL string) ([]byte, error) {
+	if rtspURL == "" {
+		return nil, fmt.Errorf("empty rtsp url")
+	}
+	ctxTimeout, cancel := context.WithTimeout(ctx, 3500*time.Millisecond)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctxTimeout, "ffmpeg",
+		"-rtsp_transport", "tcp",
+		"-stimeout", "3000000",
+		"-i", rtspURL,
+		"-vframes", "1",
+		"-q:v", "2",
+		"-f", "image2pipe",
+		"-vcodec", "mjpeg",
+		"-",
+	)
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	if err := cmd.Run(); err != nil || buf.Len() == 0 {
+		return nil, fmt.Errorf("ffmpeg snapshot capture failed: %w", err)
+	}
+	return buf.Bytes(), nil
 }
 
 // ProbeDevice queries device information, streaming profiles, and RTSP URL for a target camera.
@@ -76,17 +104,6 @@ func (a *Adapter) ProbeDevice(ctx context.Context, ipAddress string, port int, u
 		}
 	}
 
-	var snapshotURL string
-	if len(profiles) > 0 {
-		snapURI, errSnap := a.soap.getSnapshotURI(ctx, mediaEndpoint, username, password, profiles[0].Token)
-		if errSnap == nil && snapURI != "" {
-			snapBytes, errFetch := a.soap.fetchSnapshotBytes(ctx, snapURI, username, password)
-			if errFetch == nil && len(snapBytes) > 0 {
-				snapshotURL = fmt.Sprintf("data:image/jpeg;base64,%s", base64.StdEncoding.EncodeToString(snapBytes))
-			}
-		}
-	}
-
 	if defaultRTSP == "" {
 		if username != "" && password != "" {
 			defaultRTSP = fmt.Sprintf("rtsp://%s:%s@%s:554/live/ch0", username, password, ipAddress)
@@ -96,6 +113,32 @@ func (a *Adapter) ProbeDevice(ctx context.Context, ipAddress string, port int, u
 	}
 
 	cleanIP := strings.ReplaceAll(ipAddress, ".", "_")
+
+	var snapshotURL string
+	if len(profiles) > 0 {
+		snapURI, errSnap := a.soap.getSnapshotURI(ctx, mediaEndpoint, username, password, profiles[0].Token)
+		if errSnap == nil && snapURI != "" {
+			snapBytes, errFetch := a.soap.fetchSnapshotBytes(ctx, snapURI, username, password)
+			if errFetch == nil && len(snapBytes) > 0 {
+				snapshotURL = fmt.Sprintf("data:image/jpeg;base64,%s", base64.StdEncoding.EncodeToString(snapBytes))
+				_ = os.MkdirAll("samples", 0755)
+				_ = os.WriteFile(fmt.Sprintf("samples/onvif_%s_%d.jpg", cleanIP, port), snapBytes, 0644)
+				_ = os.WriteFile(fmt.Sprintf("samples/cam_%s.jpg", cleanIP), snapBytes, 0644)
+			}
+		}
+	}
+
+	// Fallback to direct RTSP frame capture if SOAP snapshot is unavailable or unsupported
+	if snapshotURL == "" && defaultRTSP != "" {
+		snapBytes, errRTSP := captureSnapshotFromRTSP(ctx, defaultRTSP)
+		if errRTSP == nil && len(snapBytes) > 0 {
+			snapshotURL = fmt.Sprintf("data:image/jpeg;base64,%s", base64.StdEncoding.EncodeToString(snapBytes))
+			_ = os.MkdirAll("samples", 0755)
+			_ = os.WriteFile(fmt.Sprintf("samples/onvif_%s_%d.jpg", cleanIP, port), snapBytes, 0644)
+			_ = os.WriteFile(fmt.Sprintf("samples/cam_%s.jpg", cleanIP), snapBytes, 0644)
+		}
+	}
+
 	name := fmt.Sprintf("%s %s", mfg, model)
 	if strings.TrimSpace(name) == "" {
 		name = fmt.Sprintf("ONVIF Cam %s", ipAddress)
@@ -122,3 +165,4 @@ func (a *Adapter) ProbeDevice(ctx context.Context, ipAddress string, port int, u
 func (a *Adapter) GetStreamURI(ctx context.Context, xaddr, username, password, profileToken string) (string, error) {
 	return a.soap.getStreamURI(ctx, xaddr, username, password, profileToken)
 }
+

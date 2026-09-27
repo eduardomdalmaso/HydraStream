@@ -1,22 +1,15 @@
 package http
 
 import (
-	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"hydrastream/internal/adapters/primary/http/middleware"
-	"hydrastream/internal/adapters/secondary/proc"
 	"hydrastream/internal/domain"
 	"hydrastream/internal/ports"
 )
@@ -55,7 +48,6 @@ func NewHandler(uc ports.StreamUseCase) *Handler {
 	}
 }
 
-
 func (h *Handler) handleStreams(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -66,7 +58,6 @@ func (h *Handler) handleStreams(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		searchQuery := r.URL.Query().Get("search")
 		tenantFilter := callerTenant
-		// Superadmin or system service accounts can optionally filter across all tenants
 		if (callerRole == "superadmin" || callerRole == "system") && r.URL.Query().Get("tenant") != "" {
 			tenantFilter = r.URL.Query().Get("tenant")
 		} else if callerRole == "superadmin" && r.URL.Query().Get("all") == "true" {
@@ -120,7 +111,6 @@ func (h *Handler) handleStreams(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Enforce tenant boundary
 		if callerRole != "superadmin" && callerRole != "system" {
 			st.TenantID = callerTenant
 		} else if st.TenantID == "" {
@@ -159,7 +149,6 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 	callerTenant := middleware.GetTenantID(r.Context())
 	callerRole := middleware.GetUserRole(r.Context())
 
-	// Helper to verify tenant ownership and prevent IDOR
 	checkOwnership := func() (*domain.Stream, error) {
 		st, err := h.useCase.GetStream(r.Context(), streamID)
 		if err != nil {
@@ -171,13 +160,11 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 		return st, nil
 	}
 
-	// Route: GET /api/v1/streams/{id}/snapshot or snapshot.jpg
 	if len(parts) >= 2 && (parts[1] == "snapshot" || parts[1] == "snapshot.jpg") {
 		h.handleSnapshot(w, r, streamID)
 		return
 	}
 
-	// Route: GET /api/v1/streams/{id}/mjpeg
 	if len(parts) >= 2 && parts[1] == "mjpeg" {
 		st, _ := h.useCase.GetStream(r.Context(), streamID)
 		if st == nil {
@@ -187,7 +174,6 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Route: GET /api/v1/streams/{id}/stats
 	if len(parts) >= 2 && parts[1] == "stats" {
 		st, err := checkOwnership()
 		if err != nil {
@@ -198,7 +184,6 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Route: GET /api/v1/streams/{id}/ingest
 	if len(parts) >= 2 && parts[1] == "ingest" {
 		if _, err := checkOwnership(); err != nil {
 			http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
@@ -217,7 +202,6 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Route: /api/v1/streams/{id}/recordings/fragments...
 	if len(parts) >= 3 && parts[1] == "recordings" && parts[2] == "fragments" {
 		if _, err := checkOwnership(); err != nil {
 			http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
@@ -231,7 +215,6 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Route: /api/v1/streams/{id}/whep...
 	if len(parts) >= 2 && parts[1] == "whep" {
 		var subParts []string
 		if len(parts) > 2 {
@@ -241,8 +224,6 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
-	// Route: PATCH /api/v1/streams/{id}/consumers/{analytic_type}
 	if len(parts) >= 3 && parts[1] == "consumers" && r.Method == http.MethodPatch {
 		if callerRole != "admin" && callerRole != "operator" && callerRole != "superadmin" {
 			http.Error(w, `{"error":"forbidden: insufficient permissions"}`, http.StatusForbidden)
@@ -271,7 +252,6 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Direct Stream CRUD
 	switch r.Method {
 	case http.MethodGet:
 		st, err := checkOwnership()
@@ -304,324 +284,4 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 	}
-}
-
-func getFFmpegPath() string {
-	if p, err := exec.LookPath("ffmpeg"); err == nil {
-		return p
-	}
-	if p, err := exec.LookPath("ffmpeg.exe"); err == nil {
-		return p
-	}
-	userProfile := os.Getenv("USERPROFILE")
-	if userProfile != "" {
-		matches, _ := filepath.Glob(filepath.Join(userProfile, "AppData", "Local", "Microsoft", "WinGet", "Packages", "*", "*", "bin", "ffmpeg.exe"))
-		if len(matches) > 0 {
-			return matches[0]
-		}
-		matches, _ = filepath.Glob(filepath.Join(userProfile, "AppData", "Local", "Microsoft", "WinGet", "Packages", "*", "bin", "ffmpeg.exe"))
-		if len(matches) > 0 {
-			return matches[0]
-		}
-	}
-	return "ffmpeg"
-}
-
-func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamID string) {
-	w.Header().Set("Content-Type", "image/jpeg")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-
-	// Strict path sanitization against Path Traversal
-	cleanBase := filepath.Base(streamID)
-	_ = os.MkdirAll("samples", 0755)
-	samplePath := filepath.Clean(filepath.Join("samples", fmt.Sprintf("%s.jpg", cleanBase)))
-	if !strings.HasPrefix(samplePath, "samples") && !strings.HasPrefix(samplePath, "samples/") && !strings.HasPrefix(samplePath, "samples\\") {
-		http.Error(w, `{"error":"invalid path"}`, http.StatusBadRequest)
-		return
-	}
-
-	isRefresh := r != nil && (r.URL.Query().Get("refresh") == "true" || r.URL.Query().Get("force") == "true")
-
-	// 1. Tentar ler frame cacheado caso não tenha sido solicitado refresh
-	if !isRefresh {
-		if data, err := os.ReadFile(samplePath); err == nil && len(data) > 0 {
-			_, _ = w.Write(data)
-			return
-		}
-	}
-
-	// 2. Buscar informações da stream se cadastrada
-	var sourceURL string
-	if st, err := h.useCase.GetStream(r.Context(), streamID); err == nil && st != nil {
-		sourceURL = st.SourceURL
-	}
-	if sourceURL == "" {
-		dbPaths := []string{
-			"../hydravms/hydravms.db",
-			"hydravms.db",
-			"c:/Users/eduar/Documents/hydravms/hydravms.db",
-		}
-		for _, dbp := range dbPaths {
-			if _, errStat := os.Stat(dbp); errStat == nil {
-				cmd := exec.Command("sqlite3", dbp, fmt.Sprintf("SELECT rtsp_url FROM cameras WHERE id = '%s' LIMIT 1;", cleanBase))
-				proc.SetHideWindow(cmd)
-				if out, errCmd := cmd.Output(); errCmd == nil {
-					u := strings.TrimSpace(string(out))
-					if u != "" {
-						sourceURL = u
-						break
-					}
-				}
-			}
-		}
-	}
-
-	// 3. Capturar frame com FFmpeg diretamente da fonte RTSP ou do MediaMTX Relay
-	var urlsToTry []string
-	if sourceURL != "" && !strings.Contains(sourceURL, "localhost:8554") {
-		urlsToTry = append(urlsToTry, sourceURL)
-	}
-	urlsToTry = append(urlsToTry,
-		fmt.Sprintf("rtsp://localhost:8554/%s_sub", cleanBase),
-		fmt.Sprintf("rtsp://localhost:8554/%s", cleanBase),
-	)
-
-	ffmpegBin := getFFmpegPath()
-	for _, u := range urlsToTry {
-		snapCmd := exec.Command(ffmpegBin, "-rtsp_transport", "tcp", "-timeout", "3000000",
-			"-i", u, "-update", "1", "-frames:v", "1", "-q:v", "2", "-y", samplePath)
-		proc.SetHideWindow(snapCmd)
-		if err := snapCmd.Run(); err == nil {
-			if data, errRead := os.ReadFile(samplePath); errRead == nil && len(data) > 0 {
-				_, _ = w.Write(data)
-				return
-			}
-		}
-	}
-
-	// Se falhou captura ao vivo mas existe frame em disco, servir frame em disco
-	if data, err := os.ReadFile(samplePath); err == nil && len(data) > 0 {
-		_, _ = w.Write(data)
-		return
-	}
-
-	// 4. Tentar capturar frame via ONVIF diretamente da câmera IP de origem
-	if sourceURL != "" {
-		if u, errParse := url.Parse(sourceURL); errParse == nil {
-			host := u.Hostname()
-			user := ""
-			pass := ""
-			if u.User != nil {
-				user = u.User.Username()
-				pass, _ = u.User.Password()
-			}
-			if host != "" && host != "127.0.0.1" && host != "localhost" {
-				ctxTimeout, cancel := context.WithTimeout(r.Context(), 3*time.Second)
-				dev, errProbe := h.useCase.ProbeONVIFDevice(ctxTimeout, domain.ONVIFProbeRequest{
-					IPAddress: host,
-					Port:      2020,
-					Username:  user,
-					Password:  pass,
-				})
-				cancel()
-				if errProbe == nil && dev != nil && dev.SnapshotURL != "" && strings.HasPrefix(dev.SnapshotURL, "data:image/jpeg;base64,") {
-					b64 := strings.TrimPrefix(dev.SnapshotURL, "data:image/jpeg;base64,")
-					if rawBytes, errDec := base64.StdEncoding.DecodeString(b64); errDec == nil && len(rawBytes) > 0 {
-						_ = os.WriteFile(samplePath, rawBytes, 0644)
-						_, _ = w.Write(rawBytes)
-						return
-					}
-				}
-			}
-		}
-	}
-
-	// 4. Fallback para imagem de amostra se existir
-	if data, err := os.ReadFile("samples/cam_10_0_0_64.jpg"); err == nil && len(data) > 0 {
-		_, _ = w.Write(data)
-		return
-	}
-
-	http.Error(w, `{"error":"snapshot unavailable"}`, http.StatusNotFound)
-}
-
-func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, st *domain.Stream) {
-	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=ffmpeg")
-	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	w.Header().Set("Pragma", "no-cache")
-	w.Header().Set("Expires", "0")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
-	flusher, hasFlusher := w.(http.Flusher)
-	if hasFlusher {
-		flusher.Flush()
-	}
-
-	streamID := filepath.Base(st.StreamID)
-	ffmpegBin := getFFmpegPath()
-
-	sourceURL := st.SourceURL
-	if sourceURL == "" {
-		dbPaths := []string{
-			"../hydravms/hydravms.db",
-			"hydravms.db",
-			"c:/Users/eduar/Documents/hydravms/hydravms.db",
-		}
-		for _, dbp := range dbPaths {
-			if _, errStat := os.Stat(dbp); errStat == nil {
-				cmd := exec.Command("sqlite3", dbp, fmt.Sprintf("SELECT rtsp_url FROM cameras WHERE id = '%s' LIMIT 1;", streamID))
-				proc.SetHideWindow(cmd)
-				if out, errCmd := cmd.Output(); errCmd == nil {
-					u := strings.TrimSpace(string(out))
-					if u != "" {
-						sourceURL = u
-						break
-					}
-				}
-			}
-		}
-	}
-
-	targetURL := sourceURL
-	if targetURL == "" || strings.HasPrefix(targetURL, "synthetic://") {
-		targetURL = fmt.Sprintf("rtsp://localhost:8554/%s", streamID)
-	}
-
-	for {
-		select {
-		case <-r.Context().Done():
-			return
-		default:
-		}
-
-		args := []string{
-			"-loglevel", "error",
-			"-fflags", "nobuffer",
-			"-flags", "low_delay",
-			"-fflags", "+discardcorrupt",
-			"-rtsp_transport", "tcp",
-			"-timeout", "5000000",
-			"-i", targetURL,
-			"-an",
-			"-threads", "2",
-			"-c:v", "mjpeg",
-			"-q:v", "5",
-			"-r", "15",
-			"-f", "mpjpeg",
-			"-boundary_tag", "ffmpeg",
-			"-",
-		}
-
-		cmd := exec.CommandContext(r.Context(), ffmpegBin, args...)
-		proc.SetHideWindow(cmd)
-		cmd.Stdout = w
-		cmd.Stderr = os.Stderr
-
-		if err := cmd.Run(); err != nil {
-			if r.Context().Err() != nil {
-				return
-			}
-			// Fallback to latest snapshot image in samples/
-			samplePath := filepath.Clean(filepath.Join("samples", fmt.Sprintf("%s.jpg", streamID)))
-			data, errRead := os.ReadFile(samplePath)
-			if errRead == nil && len(data) > 0 {
-				fmt.Fprintf(w, "--ffmpeg\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", len(data))
-				w.Write(data)
-				w.Write([]byte("\r\n"))
-				if hasFlusher {
-					flusher.Flush()
-				}
-			}
-			time.Sleep(300 * time.Millisecond)
-		}
-	}
-}
-
-func (h *Handler) handleClusterTopology(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	streamID := r.URL.Query().Get("stream_id")
-	topo, err := h.useCase.GetClusterTopology(r.Context(), streamID)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-		return
-	}
-	json.NewEncoder(w).Encode(topo)
-}
-
-func (h *Handler) handleControlPanelTelemetry(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	stats, err := h.useCase.GetControlPanelTelemetry(r.Context())
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-		return
-	}
-	json.NewEncoder(w).Encode(stats)
-}
-
-func (h *Handler) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	info, err := h.useCase.GetSystemInfo(r.Context())
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-		return
-	}
-	json.NewEncoder(w).Encode(info)
-}
-
-func (h *Handler) handleHealthz(w http.ResponseWriter, _ *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
-}
-
-func (h *Handler) handleReadyz(w http.ResponseWriter, _ *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("READY"))
-}
-
-func (h *Handler) handleMetrics(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/plain")
-	fmt.Fprintf(w, "# HELP hydrastream_ingest_fps Input FPS per stream\n")
-	fmt.Fprintf(w, "# TYPE hydrastream_ingest_fps gauge\n")
-	fmt.Fprintf(w, "hydrastream_ingest_fps{stream_id=\"cam_entrance_01\"} 30.0\n")
-}
-
-func (h *Handler) handleChaosInject(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if r.Method != http.MethodPost {
-		http.Error(w, `{"error":"POST required"}`, http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req domain.ChaosInjection
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
-		return
-	}
-
-	res, err := h.useCase.InjectChaos(r.Context(), &req)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(res)
-}
-
-func (h *Handler) handleChaosReset(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if r.Method != http.MethodPost {
-		http.Error(w, `{"error":"POST required"}`, http.StatusMethodNotAllowed)
-		return
-	}
-
-	if err := h.useCase.ResetChaos(r.Context()); err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"reset","message":"All chaos injection circuits disarmed and telemetry stabilized."}`))
 }
