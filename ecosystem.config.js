@@ -46,7 +46,7 @@ module.exports = {
     // 4. HydraVMS Backend - Control Plane REST API & WebSockets (porta 8083)
     {
       name: "hydra-vms-api",
-      cwd: "/home/hades/Documents/HydraVMS",
+      cwd: "/home/hades/Documents/hydravms",
       script: "./bin/hydravms",
       interpreter: "none",
       autorestart: true,
@@ -54,7 +54,9 @@ module.exports = {
       restart_delay: 2000,
       env: {
         PORT: "8083",
-        DATABASE_URL: "postgres://postgres:postgres@127.0.0.1:5432/hydravms?sslmode=disable",
+        DB_DRIVER: "sqlite",
+        SQLITE_PATH: "hydravms.db",
+        JWT_SECRET: "hydravms-enterprise-secure-jwt-signing-key-32b-secret",
         NATS_URL: "nats://127.0.0.1:4222",
         MINIO_ENDPOINT: "127.0.0.1:9000",
       },
@@ -63,7 +65,7 @@ module.exports = {
     // 5. HydraVMS Frontend - Painel de Controle e Orquestrador Web (porta 5173)
     {
       name: "hydra-vms",
-      cwd: "/home/hades/Documents/HydraVMS/web",
+      cwd: "/home/hades/Documents/hydravms/web",
       script: "npm",
       args: "run dev",
       autorestart: true,
