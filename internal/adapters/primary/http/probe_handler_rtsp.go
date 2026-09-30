@@ -118,7 +118,7 @@ func (h *Handler) probeRTSP(w http.ResponseWriter, req StreamProbeRequest) {
 	}
 
 	start := time.Now()
-	ffmpegBin := getFFmpegPath()
+	ffmpegBin := proc.GetFFmpegPath()
 	tmpFile := filepath.Join("samples", fmt.Sprintf("probe_%d.jpg", time.Now().UnixNano()))
 	snapCmd := exec.Command(ffmpegBin, "-rtsp_transport", "tcp", "-timeout", "5000000",
 		"-i", targetURL, "-update", "1", "-frames:v", "1", "-q:v", "2", "-y", tmpFile)

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"hydrastream/internal/adapters/secondary/proc"
 	"hydrastream/internal/domain"
 	"hydrastream/internal/ports"
 )
@@ -41,9 +42,9 @@ func captureSnapshotFromRTSP(ctx context.Context, rtspURL string) ([]byte, error
 	ctxTimeout, cancel := context.WithTimeout(ctx, 3500*time.Millisecond)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctxTimeout, "ffmpeg",
+	cmd := exec.CommandContext(ctxTimeout, proc.GetFFmpegPath(),
 		"-rtsp_transport", "tcp",
-		"-stimeout", "3000000",
+		"-timeout", "3000000",
 		"-i", rtspURL,
 		"-vframes", "1",
 		"-q:v", "2",
@@ -51,6 +52,7 @@ func captureSnapshotFromRTSP(ctx context.Context, rtspURL string) ([]byte, error
 		"-vcodec", "mjpeg",
 		"-",
 	)
+	proc.SetHideWindow(cmd)
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	if err := cmd.Run(); err != nil || buf.Len() == 0 {

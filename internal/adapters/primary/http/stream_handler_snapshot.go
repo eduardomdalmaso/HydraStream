@@ -20,27 +20,6 @@ import (
 	"hydrastream/internal/domain"
 )
 
-func getFFmpegPath() string {
-	if p, err := exec.LookPath("ffmpeg"); err == nil {
-		return p
-	}
-	if p, err := exec.LookPath("ffmpeg.exe"); err == nil {
-		return p
-	}
-	userProfile := os.Getenv("USERPROFILE")
-	if userProfile != "" {
-		matches, _ := filepath.Glob(filepath.Join(userProfile, "AppData", "Local", "Microsoft", "WinGet", "Packages", "*", "*", "bin", "ffmpeg.exe"))
-		if len(matches) > 0 {
-			return matches[0]
-		}
-		matches, _ = filepath.Glob(filepath.Join(userProfile, "AppData", "Local", "Microsoft", "WinGet", "Packages", "*", "bin", "ffmpeg.exe"))
-		if len(matches) > 0 {
-			return matches[0]
-		}
-	}
-	return "ffmpeg"
-}
-
 func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamID string) {
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -108,9 +87,9 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 		fmt.Sprintf("rtsp://localhost:8554/%s", cleanBase),
 	)
 
-	ffmpegBin := getFFmpegPath()
+	ffmpegBin := proc.GetFFmpegPath()
 	for _, u := range urlsToTry {
-		snapCmd := exec.Command(ffmpegBin, "-rtsp_transport", "tcp", "-stimeout", "3000000",
+		snapCmd := exec.Command(ffmpegBin, "-rtsp_transport", "tcp", "-timeout", "5000000",
 			"-i", u, "-update", "1", "-frames:v", "1", "-q:v", "2", "-y", samplePath)
 		proc.SetHideWindow(snapCmd)
 		if err := snapCmd.Run(); err == nil {

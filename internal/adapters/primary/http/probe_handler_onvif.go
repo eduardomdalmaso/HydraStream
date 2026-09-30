@@ -95,7 +95,7 @@ func (h *Handler) probeLoopFile(w http.ResponseWriter, req StreamProbeRequest) {
 	res := "1920x1080 Full HD"
 	fps := 30
 
-	probeCmd := exec.Command("ffprobe", "-v", "error", "-select_streams", "v:0",
+	probeCmd := exec.Command(proc.GetFFprobePath(), "-v", "error", "-select_streams", "v:0",
 		"-show_entries", "stream=codec_name,width,height,r_frame_rate",
 		"-of", "csv=p=0", foundPath)
 	proc.SetHideWindow(probeCmd)
@@ -114,7 +114,7 @@ func (h *Handler) probeLoopFile(w http.ResponseWriter, req StreamProbeRequest) {
 	}
 
 	var snapshotURI string
-	snapCmd := exec.Command("ffmpeg", "-ss", "00:00:01", "-i", foundPath, "-vframes", "1", "-q:v", "3", "-f", "image2pipe", "-c:v", "mjpeg", "pipe:1")
+	snapCmd := exec.Command(proc.GetFFmpegPath(), "-ss", "00:00:01", "-i", foundPath, "-vframes", "1", "-q:v", "3", "-f", "image2pipe", "-c:v", "mjpeg", "pipe:1")
 	proc.SetHideWindow(snapCmd)
 	if snapBytes, err := snapCmd.Output(); err == nil && len(snapBytes) > 0 {
 		snapshotURI = fmt.Sprintf("data:image/jpeg;base64,%s", base64.StdEncoding.EncodeToString(snapBytes))

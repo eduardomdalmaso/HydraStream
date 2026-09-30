@@ -27,7 +27,7 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, st *domain
 	}
 
 	streamID := filepath.Base(st.StreamID)
-	ffmpegBin := getFFmpegPath()
+	ffmpegBin := proc.GetFFmpegPath()
 
 	sourceURL := st.SourceURL
 	if sourceURL == "" {
