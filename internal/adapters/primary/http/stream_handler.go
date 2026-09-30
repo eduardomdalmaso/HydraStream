@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -120,6 +122,14 @@ func (h *Handler) handleStreams(w http.ResponseWriter, r *http.Request) {
 		if err := h.useCase.RegisterStream(r.Context(), &st); err != nil {
 			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
 			return
+		}
+
+		cleanBase := filepath.Base(st.StreamID)
+		targetSample := filepath.Join("samples", fmt.Sprintf("%s.jpg", cleanBase))
+		if _, errStat := os.Stat(targetSample); os.IsNotExist(errStat) {
+			if probeData, errP := os.ReadFile(filepath.Join("samples", "latest_probe.jpg")); errP == nil && len(probeData) > 0 {
+				_ = os.WriteFile(targetSample, probeData, 0644)
+			}
 		}
 
 		w.WriteHeader(http.StatusCreated)

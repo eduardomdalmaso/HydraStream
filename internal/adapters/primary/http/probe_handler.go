@@ -11,6 +11,8 @@ import (
 
 // StreamProbeRequest defines payload for checking stream connectivity.
 type StreamProbeRequest struct {
+	StreamID  string `json:"stream_id,omitempty"`
+	CameraID  string `json:"camera_id,omitempty"`
 	Protocol  string `json:"protocol"`
 	URL       string `json:"url"`
 	IPAddress string `json:"ip_address"`

@@ -128,6 +128,16 @@ func (h *Handler) probeRTSP(w http.ResponseWriter, req StreamProbeRequest) {
 
 	if errCmd == nil {
 		if data, errRead := os.ReadFile(tmpFile); errRead == nil && len(data) > 0 {
+			targetStreamID := req.StreamID
+			if targetStreamID == "" {
+				targetStreamID = req.CameraID
+			}
+			_ = os.MkdirAll("samples", 0755)
+			if targetStreamID != "" {
+				cleanID := filepath.Base(targetStreamID)
+				_ = os.WriteFile(filepath.Join("samples", fmt.Sprintf("%s.jpg", cleanID)), data, 0644)
+			}
+			_ = os.WriteFile(filepath.Join("samples", "latest_probe.jpg"), data, 0644)
 			_ = os.Remove(tmpFile)
 			b64 := "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(data)
 			codec, res, fps := extractMediaInfoFromFFmpeg(outStr)

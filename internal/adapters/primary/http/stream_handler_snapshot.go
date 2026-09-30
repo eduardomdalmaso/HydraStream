@@ -88,6 +88,23 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 				return
 			}
 		}
+	} else {
+		if fi, errStat := os.Stat(samplePath); errStat == nil && time.Since(fi.ModTime()) < 5*time.Second {
+			if data, errRead := os.ReadFile(samplePath); errRead == nil && len(data) > 0 {
+				_, _ = w.Write(data)
+				return
+			}
+		}
+	}
+
+	if _, errStat := os.Stat(samplePath); os.IsNotExist(errStat) {
+		if probeData, errP := os.ReadFile(filepath.Join("samples", "latest_probe.jpg")); errP == nil && len(probeData) > 0 {
+			if fiP, errStatP := os.Stat(filepath.Join("samples", "latest_probe.jpg")); errStatP == nil && time.Since(fiP.ModTime()) < 60*time.Second {
+				_ = os.WriteFile(samplePath, probeData, 0644)
+				_, _ = w.Write(probeData)
+				return
+			}
+		}
 	}
 
 	var urlsToTry []string
