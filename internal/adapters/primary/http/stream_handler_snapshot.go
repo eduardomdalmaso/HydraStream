@@ -1,9 +1,13 @@
 package http
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
+	"image"
+	"image/color"
+	"image/jpeg"
 	"net/http"
 	"net/url"
 	"os"
@@ -152,5 +156,26 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 		}
 	}
 
-	http.Error(w, `{"error":"snapshot unavailable"}`, http.StatusNotFound)
+	standbyData := generateStandbySnapshot(cleanBase)
+	_ = os.WriteFile(samplePath, standbyData, 0644)
+	_, _ = w.Write(standbyData)
+}
+
+func generateStandbySnapshot(streamID string) []byte {
+	width, height := 640, 360
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	bg := color.RGBA{R: 11, G: 14, B: 20, A: 255}
+	grid := color.RGBA{R: 20, G: 28, B: 42, A: 255}
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			if x%40 == 0 || y%40 == 0 {
+				img.Set(x, y, grid)
+			} else {
+				img.Set(x, y, bg)
+			}
+		}
+	}
+	var buf bytes.Buffer
+	_ = jpeg.Encode(&buf, img, &jpeg.Options{Quality: 85})
+	return buf.Bytes()
 }
