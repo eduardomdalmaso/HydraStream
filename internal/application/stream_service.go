@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -122,6 +123,12 @@ func (s *StreamService) DeleteStream(ctx context.Context, streamID string) error
 	}
 	if s.ingestor != nil {
 		_ = s.ingestor.StopIngest(ctx, streamID)
+	}
+	cleanBase := filepath.Base(streamID)
+	_ = os.Remove(filepath.Join("samples", fmt.Sprintf("%s.jpg", cleanBase)))
+	altMatches, _ := filepath.Glob(fmt.Sprintf("samples/*%s*.jpg", cleanBase))
+	for _, alt := range altMatches {
+		_ = os.Remove(alt)
 	}
 	go deleteMediaMTXPath(streamID)
 	s.RecordLog(domain.LogLevelInfo, "stream", fmt.Sprintf("Stream '%s' unregistered and ingest stopped", streamID), nil)

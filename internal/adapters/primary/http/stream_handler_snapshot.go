@@ -33,22 +33,6 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 		return
 	}
 
-	isRefresh := r != nil && (r.URL.Query().Get("refresh") == "true" || r.URL.Query().Get("force") == "true")
-
-	if !isRefresh {
-		if data, err := os.ReadFile(samplePath); err == nil && len(data) > 0 {
-			_, _ = w.Write(data)
-			return
-		}
-		altMatches, _ := filepath.Glob(fmt.Sprintf("samples/*%s*.jpg", cleanBase))
-		for _, alt := range altMatches {
-			if data, err := os.ReadFile(alt); err == nil && len(data) > 0 {
-				_, _ = w.Write(data)
-				return
-			}
-		}
-	}
-
 	var sourceURL string
 	if r != nil && r.URL.Query().Get("url") != "" {
 		sourceURL = r.URL.Query().Get("url")
@@ -65,7 +49,7 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 		}
 		for _, dbp := range dbPaths {
 			if _, errStat := os.Stat(dbp); errStat == nil {
-				cmd := exec.Command("sqlite3", dbp, fmt.Sprintf("SELECT rtsp_url FROM cameras WHERE id = '%s' OR id LIKE '%%%s%%' LIMIT 1;", cleanBase, cleanBase))
+				cmd := exec.Command("sqlite3", dbp, fmt.Sprintf("SELECT rtsp_url FROM cameras WHERE id = '%s' AND (is_active = 1 OR is_active IS NULL) LIMIT 1;", cleanBase))
 				proc.SetHideWindow(cmd)
 				if out, errCmd := cmd.Output(); errCmd == nil {
 					u := strings.TrimSpace(string(out))
@@ -74,6 +58,34 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 						break
 					}
 				}
+			}
+		}
+	}
+
+	// If the stream does not exist or was deleted, purge stale cache and return standby frame
+	if sourceURL == "" {
+		_ = os.Remove(samplePath)
+		altMatches, _ := filepath.Glob(fmt.Sprintf("samples/*%s*.jpg", cleanBase))
+		for _, alt := range altMatches {
+			_ = os.Remove(alt)
+		}
+		standbyData := generateStandbySnapshot(cleanBase)
+		_, _ = w.Write(standbyData)
+		return
+	}
+
+	isRefresh := r != nil && (r.URL.Query().Get("refresh") == "true" || r.URL.Query().Get("force") == "true")
+
+	if !isRefresh {
+		if data, err := os.ReadFile(samplePath); err == nil && len(data) > 0 {
+			_, _ = w.Write(data)
+			return
+		}
+		altMatches, _ := filepath.Glob(fmt.Sprintf("samples/*%s*.jpg", cleanBase))
+		for _, alt := range altMatches {
+			if data, err := os.ReadFile(alt); err == nil && len(data) > 0 {
+				_, _ = w.Write(data)
+				return
 			}
 		}
 	}
