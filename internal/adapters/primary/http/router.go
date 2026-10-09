@@ -2,6 +2,9 @@ package http
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"hydrastream/internal/adapters/primary/http/middleware"
 )
@@ -22,7 +25,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		mux.Handle(pattern, handler)
 	}
 
-	// 1. Public Endpoints (Root Discovery, Health, Metrics, Swagger)
+	// 1. Public Endpoints (Root Discovery, Health, Metrics, Swagger, Samples)
 	mux.HandleFunc("/", telH.HandleRoot)
 	mux.HandleFunc("/healthz", telH.HandleHealthz)
 	mux.HandleFunc("/readyz", telH.HandleReadyz)
@@ -31,6 +34,27 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/swagger/doc.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(OpenAPI3Spec))
+	})
+	mux.HandleFunc("/samples/", func(w http.ResponseWriter, r *http.Request) {
+		cleanPath := filepath.Clean(strings.TrimPrefix(r.URL.Path, "/samples/"))
+		if strings.Contains(cleanPath, "..") {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		localDirs := []string{
+			"samples",
+			"/home/hades/Documents/HydraStream/samples",
+		}
+		for _, d := range localDirs {
+			target := filepath.Join(d, cleanPath)
+			if fi, err := os.Stat(target); err == nil && !fi.IsDir() {
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+				w.Header().Set("Cache-Control", "public, max-age=86400")
+				http.ServeFile(w, r, target)
+				return
+			}
+		}
+		http.NotFound(w, r)
 	})
 
 	// 2. Protected Stream Management Endpoints (Auth Required)

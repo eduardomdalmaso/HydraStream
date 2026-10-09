@@ -50,9 +50,12 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, st *domain
 		}
 	}
 
-	targetURL := sourceURL
-	if targetURL == "" || strings.HasPrefix(targetURL, "synthetic://") {
-		targetURL = fmt.Sprintf("rtsp://localhost:8554/%s", streamID)
+	urlsToTry := []string{
+		fmt.Sprintf("rtsp://localhost:8554/%s_sub", streamID),
+		fmt.Sprintf("rtsp://localhost:8554/%s", streamID),
+	}
+	if sourceURL != "" && !strings.Contains(sourceURL, "localhost:8554") {
+		urlsToTry = append(urlsToTry, sourceURL)
 	}
 
 	for {
@@ -62,44 +65,40 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, st *domain
 		default:
 		}
 
-		args := []string{
-			"-loglevel", "error",
-			"-fflags", "nobuffer",
-			"-flags", "low_delay",
-			"-fflags", "+discardcorrupt",
-			"-rtsp_transport", "tcp",
-			"-timeout", "5000000",
-			"-i", targetURL,
-			"-an",
-			"-threads", "2",
-			"-c:v", "mjpeg",
-			"-q:v", "5",
-			"-r", "15",
-			"-f", "mpjpeg",
-			"-boundary_tag", "ffmpeg",
-			"-",
-		}
+		streamed := false
+		for _, targetURL := range urlsToTry {
+			args := []string{
+				"-loglevel", "error",
+				"-fflags", "nobuffer",
+				"-flags", "low_delay",
+				"-fflags", "+discardcorrupt",
+				"-rtsp_transport", "tcp",
+				"-timeout", "5000000",
+				"-i", targetURL,
+				"-an",
+				"-threads", "2",
+				"-c:v", "mjpeg",
+				"-q:v", "5",
+				"-r", "15",
+				"-f", "mpjpeg",
+				"-boundary_tag", "ffmpeg",
+				"-",
+			}
 
-		cmd := exec.CommandContext(r.Context(), ffmpegBin, args...)
-		proc.SetHideWindow(cmd)
-		cmd.Stdout = w
-		cmd.Stderr = os.Stderr
+			cmd := exec.CommandContext(r.Context(), ffmpegBin, args...)
+			proc.SetHideWindow(cmd)
+			cmd.Stdout = w
+			cmd.Stderr = os.Stderr
 
-		if err := cmd.Run(); err != nil {
-			if r.Context().Err() != nil {
+			if err := cmd.Run(); err == nil || r.Context().Err() != nil {
 				return
 			}
-			samplePath := filepath.Clean(filepath.Join("samples", fmt.Sprintf("%s.jpg", streamID)))
-			data, errRead := os.ReadFile(samplePath)
-			if errRead == nil && len(data) > 0 {
-				fmt.Fprintf(w, "--ffmpeg\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", len(data))
-				w.Write(data)
-				w.Write([]byte("\r\n"))
-				if hasFlusher {
-					flusher.Flush()
-				}
-			}
-			time.Sleep(300 * time.Millisecond)
+			streamed = true
 		}
+
+		if !streamed || r.Context().Err() != nil {
+			return
+		}
+		time.Sleep(300 * time.Millisecond)
 	}
 }
