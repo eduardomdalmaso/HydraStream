@@ -76,6 +76,29 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 
 	isRefresh := r != nil && (r.URL.Query().Get("refresh") == "true" || r.URL.Query().Get("force") == "true")
 
+	// 1. If H264 forwarder is active, it continuously writes samplePath at 1 FPS
+	if isH264BridgeActive(cleanBase) {
+		for i := 0; i < 4; i++ {
+			if fi, errStat := os.Stat(samplePath); errStat == nil && time.Since(fi.ModTime()) < 3*time.Second {
+				if data, errRead := os.ReadFile(samplePath); errRead == nil && len(data) > 0 {
+					_, _ = w.Write(data)
+					return
+				}
+			}
+			time.Sleep(250 * time.Millisecond)
+		}
+	}
+
+	// 2. If MJPEG reader is active, grab 1 frame directly from local HTTP stream to avoid RTSP socket collision
+	if isMJPEGActive(cleanBase) {
+		if frame, err := extractFrameFromLocalMJPEG(cleanBase); err == nil && len(frame) > 0 {
+			_ = os.WriteFile(samplePath, frame, 0644)
+			_, _ = w.Write(frame)
+			return
+		}
+	}
+
+	// 3. If not refresh, deliver cached file immediately
 	if !isRefresh {
 		if data, err := os.ReadFile(samplePath); err == nil && len(data) > 0 {
 			_, _ = w.Write(data)
@@ -84,13 +107,6 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 		altMatches, _ := filepath.Glob(fmt.Sprintf("samples/*%s*.jpg", cleanBase))
 		for _, alt := range altMatches {
 			if data, err := os.ReadFile(alt); err == nil && len(data) > 0 {
-				_, _ = w.Write(data)
-				return
-			}
-		}
-	} else {
-		if fi, errStat := os.Stat(samplePath); errStat == nil && time.Since(fi.ModTime()) < 5*time.Second {
-			if data, errRead := os.ReadFile(samplePath); errRead == nil && len(data) > 0 {
 				_, _ = w.Write(data)
 				return
 			}
@@ -118,7 +134,7 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 
 	ffmpegBin := proc.GetFFmpegPath()
 	for _, u := range urlsToTry {
-		snapCmd := exec.Command(ffmpegBin, "-rtsp_transport", "tcp", "-timeout", "5000000",
+		snapCmd := exec.Command(ffmpegBin, "-rtsp_transport", "tcp", "-timeout", "3000000",
 			"-i", u, "-update", "1", "-frames:v", "1", "-q:v", "2", "-y", samplePath)
 		proc.SetHideWindow(snapCmd)
 		if err := snapCmd.Run(); err == nil {
@@ -186,4 +202,41 @@ func generateStandbySnapshot(_ string) []byte {
 	var buf bytes.Buffer
 	_ = jpeg.Encode(&buf, img, &jpeg.Options{Quality: 85})
 	return buf.Bytes()
+}
+
+func extractFrameFromLocalMJPEG(streamID string) ([]byte, error) {
+	url := fmt.Sprintf("http://127.0.0.1:8080/api/v1/streams/%s/mjpeg", streamID)
+	client := &http.Client{Timeout: 1500 * time.Millisecond}
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	buf := make([]byte, 512*1024)
+	nTotal := 0
+	startIdx := -1
+
+	for nTotal < len(buf) {
+		n, err := resp.Body.Read(buf[nTotal:])
+		if n > 0 {
+			nTotal += n
+			if startIdx == -1 {
+				startIdx = bytes.Index(buf[:nTotal], []byte{0xFF, 0xD8})
+			}
+			if startIdx != -1 {
+				endIdx := bytes.Index(buf[startIdx+2:nTotal], []byte{0xFF, 0xD9})
+				if endIdx != -1 {
+					fullEnd := startIdx + 2 + endIdx + 2
+					frame := make([]byte, fullEnd-startIdx)
+					copy(frame, buf[startIdx:fullEnd])
+					return frame, nil
+				}
+			}
+		}
+		if err != nil {
+			break
+		}
+	}
+	return nil, fmt.Errorf("frame not found in mjpeg stream")
 }

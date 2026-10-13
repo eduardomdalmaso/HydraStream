@@ -94,6 +94,9 @@ func (h *Handler) handleH264BridgeStart(w http.ResponseWriter, r *http.Request, 
 	targetRTMP := fmt.Sprintf("rtmp://127.0.0.1:%s/live/%s", rtmpPort, cleanID)
 	ffmpegBin := proc.GetFFmpegPath()
 
+	_ = os.MkdirAll("samples", 0755)
+	samplePath := filepath.Clean(filepath.Join("samples", fmt.Sprintf("%s.jpg", cleanID)))
+
 	args := []string{
 		"-loglevel", "warning",
 		"-fflags", "+genpts",
@@ -104,6 +107,10 @@ func (h *Handler) handleH264BridgeStart(w http.ResponseWriter, r *http.Request, 
 		"-an",
 		"-f", "flv",
 		targetRTMP,
+		"-map", "0:v",
+		"-vf", "fps=1",
+		"-update", "1",
+		"-y", samplePath,
 	}
 
 	cmd := exec.Command(ffmpegBin, args...)
@@ -145,4 +152,17 @@ func (h *Handler) handleH264BridgeStop(w http.ResponseWriter, _ *http.Request, s
 
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "stopped", "stream_id": streamID})
+}
+
+func isH264BridgeActive(streamID string) bool {
+	h264BridgeMu.Lock()
+	defer h264BridgeMu.Unlock()
+	cleanID := filepath.Base(streamID)
+	baseID := strings.TrimSuffix(cleanID, "_sub")
+	for _, id := range []string{streamID, cleanID, baseID} {
+		if cmd, ok := h264Bridges[id]; ok && cmd != nil && cmd.Process != nil {
+			return true
+		}
+	}
+	return false
 }

@@ -157,3 +157,16 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, st *domain
 	}
 }
 
+func isMJPEGActive(streamID string) bool {
+	mjpegMu.Lock()
+	defer mjpegMu.Unlock()
+	cleanID := filepath.Base(streamID)
+	baseID := strings.TrimSuffix(cleanID, "_sub")
+	for _, id := range []string{streamID, cleanID, baseID} {
+		if _, ok := mjpegCancels[id]; ok {
+			return true
+		}
+	}
+	return false
+}
+
