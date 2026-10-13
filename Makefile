@@ -55,7 +55,12 @@ benchmark:
 # Run Side-by-Side Comparison: Traditional vs HydraStream CPU vs HydraStream GPU
 benchmark-compare:
 	@echo "⚡ Running Real-Hardware Benchmark: Traditional vs HydraStream CPU vs HydraStream GPU..."
-	/home/hades/miniconda3/envs/analytics-env/bin/python benchmarks/run_comparison_benchmark.py
+	python3 benchmarks/run_comparison_benchmark.py
+
+# Run Direct MediaMTX vs HydraStream Native Architecture Benchmark
+benchmark-mtx:
+	@echo "⚡ Running MediaMTX vs HydraStream Native Zero-Copy Benchmark..."
+	python3 benchmarks/mediamtx_vs_hydrastream_benchmark.py
 
 # Build Debian / Ubuntu .deb package
 package-deb:
