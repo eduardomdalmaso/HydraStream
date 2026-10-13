@@ -77,11 +77,11 @@ func (h *Handler) HandlePublishStream(w http.ResponseWriter, r *http.Request) {
 	host := getHostForPublish(r)
 	rtmpPort := os.Getenv("RTMP_PORT")
 	if rtmpPort == "" {
-		rtmpPort = "1935"
+		rtmpPort = "1936"
 	}
 	wspPort := os.Getenv("WSP_PORT")
 	if wspPort == "" {
-		wspPort = "8085"
+		wspPort = "8086"
 	}
 
 	publishURL := fmt.Sprintf("rtmp://%s:%s/live/%s", host, rtmpPort, streamID)

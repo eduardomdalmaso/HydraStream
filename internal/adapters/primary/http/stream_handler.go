@@ -250,6 +250,17 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(parts) >= 3 && parts[1] == "h264" {
+		if parts[2] == "start" {
+			h.handleH264BridgeStart(w, r, streamID)
+			return
+		}
+		if parts[2] == "stop" {
+			h.handleH264BridgeStop(w, r, streamID)
+			return
+		}
+	}
+
 	if len(parts) >= 3 && parts[1] == "consumers" && r.Method == http.MethodPatch {
 		if callerRole != "admin" && callerRole != "operator" && callerRole != "superadmin" {
 			http.Error(w, `{"error":"forbidden: insufficient permissions"}`, http.StatusForbidden)

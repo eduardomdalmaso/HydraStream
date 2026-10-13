@@ -70,7 +70,20 @@ func startEmbeddedWspEngine() *exec.Cmd {
 
 	port := os.Getenv("WSP_PORT")
 	if port == "" {
-		port = "8085"
+		if isPortInUse(":8085") {
+			port = "8086"
+		} else {
+			port = "8085"
+		}
+	}
+
+	rtmpPort := os.Getenv("RTMP_PORT")
+	if rtmpPort == "" {
+		if isPortInUse(":1935") {
+			rtmpPort = "1936"
+		} else {
+			rtmpPort = "1935"
+		}
 	}
 
 	checkAddr := ":" + port
@@ -79,7 +92,7 @@ func startEmbeddedWspEngine() *exec.Cmd {
 		return nil
 	}
 
-	cmd := exec.Command(binPath, "server", "--port", port)
+	cmd := exec.Command(binPath, "server", "--port", port, "--rtmp-port", rtmpPort)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -88,6 +101,6 @@ func startEmbeddedWspEngine() *exec.Cmd {
 		return nil
 	}
 
-	log.Printf("🚀 [HydraStream] Embedded Rust WSP Engine started (PID %d) on port ws://0.0.0.0:%s\n", cmd.Process.Pid, port)
+	log.Printf("🚀 [HydraStream] Embedded Rust WSP Engine started (PID %d) on ws://0.0.0.0:%s (RTMP push :%s)\n", cmd.Process.Pid, port, rtmpPort)
 	return cmd
 }

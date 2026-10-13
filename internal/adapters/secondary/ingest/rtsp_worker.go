@@ -13,7 +13,7 @@ import (
 func (r *RTSPIngestor) runWorker(ctx context.Context, sess *ingestSession, stream *domain.Stream) {
 	isRTSP := strings.HasPrefix(strings.ToLower(sess.sourceURL), "rtsp://")
 
-	if !isRTSP {
+	if !isRTSP || stream.DecodingEngine == "mjpeg_and_wsp" {
 		log.Printf("[HydraStream Ingest] Stream '%s' active (%s @ %.0f FPS).", sess.streamID, sess.sourceURL, stream.IngestFPS)
 		r.runSyntheticPump(ctx, sess, stream.IngestFPS)
 		return
