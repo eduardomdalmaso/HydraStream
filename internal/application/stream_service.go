@@ -101,7 +101,7 @@ func (s *StreamService) RegisterStream(ctx context.Context, stream *domain.Strea
 			return err
 		}
 	}
-	go syncMediaMTXPath(stream.StreamID, stream.SourceURL, stream.Codec)
+	go syncEngineStream(stream.StreamID, stream.SourceURL, stream.Codec)
 	s.RecordLog(domain.LogLevelInfo, "stream", fmt.Sprintf("Stream '%s' registered successfully (Codec: %s, Ingest FPS: %.1f)", stream.StreamID, stream.Codec, stream.IngestFPS), nil)
 	return nil
 }
@@ -130,7 +130,7 @@ func (s *StreamService) DeleteStream(ctx context.Context, streamID string) error
 	for _, alt := range altMatches {
 		_ = os.Remove(alt)
 	}
-	go deleteMediaMTXPath(streamID)
+	go deleteEngineStream(streamID)
 	s.RecordLog(domain.LogLevelInfo, "stream", fmt.Sprintf("Stream '%s' unregistered and ingest stopped", streamID), nil)
 	return s.repo.Delete(ctx, streamID)
 }

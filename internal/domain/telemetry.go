@@ -116,7 +116,6 @@ type HardwareTelemetry struct {
 type ServiceStatus struct {
 	RTSPIngestor    string `json:"rtsp_ingestor"`
 	WSPEngine       string `json:"wsp_engine"`
-	MediaMTXRelay   string `json:"mediamtx_relay,omitempty"`
 	POSIXSHMBuffers string `json:"posix_shm_buffers"`
 	NATSEventMesh   string `json:"nats_event_mesh"`
 	GPUAcceleration string `json:"gpu_acceleration"`

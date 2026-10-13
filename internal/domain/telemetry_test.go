@@ -30,7 +30,7 @@ func TestTelemetryDomainModels(t *testing.T) {
 		StartedAt:     now.Add(-120 * time.Second),
 		Services: domain.ServiceStatus{
 			RTSPIngestor:    "ONLINE",
-			MediaMTXRelay:   "ONLINE",
+			WSPEngine:       "ONLINE",
 			POSIXSHMBuffers: "ONLINE",
 			NATSEventMesh:   "ONLINE",
 			GPUAcceleration: "ONLINE",

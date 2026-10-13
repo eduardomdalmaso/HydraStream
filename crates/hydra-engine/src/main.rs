@@ -11,7 +11,7 @@ use hydra_engine::shm::{ShmReader, ShmWriter};
 fn print_usage() {
     println!("HydraStream Zero-Copy Engine");
     println!("Usage:");
-    println!("  hydra-engine server [--port 8085]");
+    println!("  hydra-engine server [--port 8085] [--rtmp-port 1935]");
     println!("  hydra-engine ingest --id <stream_id> [--width 1920] [--height 1080] [--format 1] [--slots 16]");
     println!("  hydra-engine benchmark");
 }
@@ -203,12 +203,19 @@ fn run_ingest(args: &[String]) {
 
 fn run_server(args: &[String]) {
     let mut port = 8085;
+    let mut rtmp_port = 1935;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
             "--port" | "-p" => {
                 if i + 1 < args.len() {
                     port = args[i + 1].parse().unwrap_or(8085);
+                    i += 1;
+                }
+            }
+            "--rtmp-port" | "-r" => {
+                if i + 1 < args.len() {
+                    rtmp_port = args[i + 1].parse().unwrap_or(1935);
                     i += 1;
                 }
             }
@@ -223,25 +230,45 @@ fn run_server(args: &[String]) {
         }
     }
 
+    if let Ok(env_rtmp_port) = env::var("RTMP_PORT") {
+        if let Ok(p) = env_rtmp_port.parse() {
+            rtmp_port = p;
+        }
+    }
+
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
-        .expect("Failed to build Tokio runtime for WSP Server");
+        .expect("Failed to build Tokio runtime for Hydra Engine Server");
 
     rt.block_on(async move {
-        let addr = format!("0.0.0.0:{}", port).parse().expect("Invalid socket address");
+        let wsp_addr = format!("0.0.0.0:{}", port).parse().expect("Invalid WSP socket address");
+        let rtmp_addr = format!("0.0.0.0:{}", rtmp_port).parse().expect("Invalid RTMP socket address");
         let registry = Arc::new(hydra_engine::server::StreamRegistry::new());
-        let server = hydra_engine::server::WspServer::new(addr, registry);
+
+        let wsp_server = hydra_engine::server::WspServer::new(wsp_addr, Arc::clone(&registry));
+        let rtmp_server = hydra_engine::rtmp::RtmpServer::new(rtmp_addr, Arc::clone(&registry));
 
         if let Some(gpu) = hydra_engine::transcode::detect_nvidia_gpu() {
-            println!("⚡ [Hydra WSP Engine] NVIDIA Hardware Acceleration Active: {}", gpu);
+            println!("⚡ [Hydra Engine] NVIDIA Hardware Acceleration Active: {}", gpu);
         } else {
-            println!("ℹ️ [Hydra WSP Engine] NVIDIA GPU not detected. Passthrough mode active.");
+            println!("ℹ️ [Hydra Engine] NVIDIA GPU not detected. Passthrough mode active.");
         }
 
-        println!("🚀 [Hydra WSP Engine] Starting server on ws://0.0.0.0:{}", port);
-        if let Err(e) = server.run().await {
-            eprintln!("❌ [Hydra WSP Engine] Server error: {}", e);
+        println!("🚀 [Hydra Engine] Starting WSP server on ws://0.0.0.0:{}", port);
+        println!("🚀 [Hydra Engine] Starting RTMP push server on rtmp://0.0.0.0:{}", rtmp_port);
+
+        tokio::select! {
+            wsp_res = wsp_server.run() => {
+                if let Err(e) = wsp_res {
+                    eprintln!("❌ [Hydra WSP Engine] Server error: {}", e);
+                }
+            }
+            rtmp_res = rtmp_server.run() => {
+                if let Err(e) = rtmp_res {
+                    eprintln!("❌ [Hydra RTMP Ingest] Server error: {}", e);
+                }
+            }
         }
     });
 }

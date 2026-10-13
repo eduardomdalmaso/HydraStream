@@ -23,19 +23,23 @@ type StreamProbeRequest struct {
 
 // StreamProbeResponse holds diagnostic and metadata results from probing a stream.
 type StreamProbeResponse struct {
-	Online       bool   `json:"online"`
-	Error        string `json:"error,omitempty"`
-	AuthRequired bool   `json:"auth_required,omitempty"`
-	Codec        string `json:"codec,omitempty"`
-	Resolution   string `json:"resolution,omitempty"`
-	FPS          int    `json:"fps,omitempty"`
-	LatencyMs    int64  `json:"latency_ms,omitempty"`
-	SnapshotURL  string `json:"snapshot_url,omitempty"`
-	Manufacturer string `json:"manufacturer,omitempty"`
-	Model        string `json:"model,omitempty"`
-	Firmware     string `json:"firmware,omitempty"`
-	SerialNumber string `json:"serial_number,omitempty"`
-	RTSPURL      string `json:"rtsp_url,omitempty"`
+	Online         bool     `json:"online"`
+	Error          string   `json:"error,omitempty"`
+	AuthRequired   bool     `json:"auth_required,omitempty"`
+	Codec          string   `json:"codec,omitempty"`
+	Resolution     string   `json:"resolution,omitempty"`
+	FPS            int      `json:"fps,omitempty"`
+	LatencyMs      int64    `json:"latency_ms,omitempty"`
+	SnapshotURL    string   `json:"snapshot_url,omitempty"`
+	Manufacturer   string   `json:"manufacturer,omitempty"`
+	Model          string   `json:"model,omitempty"`
+	Firmware       string   `json:"firmware,omitempty"`
+	SerialNumber   string   `json:"serial_number,omitempty"`
+	RTSPURL        string   `json:"rtsp_url,omitempty"`
+	ONVIFAvailable bool     `json:"onvif_available,omitempty"`
+	ONVIFPort      int      `json:"onvif_port,omitempty"`
+	SubstreamURL   string   `json:"substream_url,omitempty"`
+	Profiles       []string `json:"profiles,omitempty"`
 }
 
 func isBlockedIPTarget(host string) error {

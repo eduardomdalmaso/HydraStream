@@ -14,6 +14,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// Telemetry & Health Handler
 	telH := NewTelemetryHandler(h.useCase)
 	onvifH := NewONVIFHandler(h.useCase)
+	diagH := NewDiagnosticsHandler(h.useCase)
 
 	// Helper to protect endpoints with Auth and optional RBAC middlewares
 	authEndpoint := func(pattern string, fn http.HandlerFunc, roles ...string) {
@@ -60,6 +61,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// 2. Protected Stream Management Endpoints (Auth Required)
 	authEndpoint("/api/v1/streams", h.handleStreams)
 	authEndpoint("/api/v1/streams/", h.handleStreamByID)
+	authEndpoint("/api/v1/streams/publish", h.HandlePublishStream, "admin", "operator", "superadmin", "system")
 	authEndpoint("/api/v1/streams/probe", h.HandleProbeStream)
 	authEndpoint("/api/v1/streams/samples", h.HandleListSamples)
 	authEndpoint("/api/v1/cluster/topology", h.handleClusterTopology)
@@ -76,6 +78,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	authEndpoint("/api/v1/telemetry/logs", telH.HandleLogs)
 	authEndpoint("/api/v1/telemetry/errors", telH.HandleErrors)
 	authEndpoint("/api/v1/telemetry/stats", h.handleControlPanelTelemetry)
+	authEndpoint("/api/v1/diagnostics", diagH.HandleSystemDiagnostics)
 
 	// 5. Protected ONVIF Discovery & Ingestion
 	authEndpoint("/api/v1/onvif/discover", onvifH.HandleDiscover)

@@ -44,7 +44,8 @@ hydrastream
 ### Regras Inquebráveis de Backend:
 1. **Pureza do Domínio:** O pacote `internal/domain/` **NUNCA** deve importar pacotes de infraestrutura como `net/http`, `database/sql` ou bibliotecas externas de rede.
 2. **Concorrência Segura:** Toda sessão de stream ou worker é isolada com `context.WithCancel` e sincronizada via ponteiros atômicos (`sync/atomic`) e `sync.RWMutex`.
-3. **Hardware Acceleration:** Prioridade máxima para Zero-Copy (`/dev/shm` no CPU e `CUDA IPC` na VRAM da NVIDIA RTX 5090).
+3. **Hardware Acceleration:** Prioridade máxima para Zero-Copy (`/dev/shm` no CPU e `CUDA IPC` na VRAM da GPU NVIDIA).
+4. **Modularidade e Limite de Linhas Backend (Go & Rust):** Arquivos de implementação Go e Rust devem ser mantidos enxutos e modulares (meta de <= 200-250 linhas, teto absoluto de 350 linhas). Módulos que crescem devem ser decompostos em submódulos coesos (ex: `rtmp/`, `transport/`), e testes extensos extraídos para diretórios `tests/` ou arquivos `_test.go`.
 
 ---
 
@@ -166,10 +167,13 @@ Ao final de **qualquer modificação de código**, o agente deve obrigatoriament
 # 1. Auditoria de Limite de Linhas Web (Composables <= 120, Views <= 200, Locales/Types isentos)
 wc -l web/css/*.css web/css/*/*.css web/js/*.js web/js/*/*.js web/src/**/*.css web/src/**/*.jsx 2>/dev/null | awk '$2 !~ /locales|types/ && $1 > 200 { print "VIOLATION: " $2 " has " $1 " lines (>200)" }'
 
-# 2. Auditoria de Pureza DDD (Nenhum import de net/http no domínio)
+# 2. Auditoria de Limite de Linhas Backend (Go & Rust <= 350 teto)
+wc -l crates/hydra-engine/src/*.rs crates/hydra-engine/src/*/*.rs 2>/dev/null | awk '$2 != "total" && $2 !~ /tests/ && $1 > 350 { print "VIOLATION RUST: " $2 " has " $1 " lines (>350)" }'
+
+# 3. Auditoria de Pureza DDD (Nenhum import de net/http no domínio)
 grep -rn "net/http" internal/domain/ && echo "VIOLAÇÃO DDD: Remova net/http do domínio!"
 
-# 3. Compilação e Testes Automatizados
+# 4. Compilação e Testes Automatizados
 make test && make build
 
 # 4. Auditoria de Paridade de Internacionalização (i18n)

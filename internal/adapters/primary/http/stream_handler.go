@@ -39,6 +39,7 @@ type Handler struct {
 	useCase     ports.StreamUseCase
 	fragHandler *FragmentHandler
 	whepHandler *WHEPHandler
+	diagHandler *DiagnosticsHandler
 }
 
 // NewHandler initializes HTTP handler adapters.
@@ -47,6 +48,7 @@ func NewHandler(uc ports.StreamUseCase) *Handler {
 		useCase:     uc,
 		fragHandler: NewFragmentHandler(uc),
 		whepHandler: NewWHEPHandler(uc),
+		diagHandler: NewDiagnosticsHandler(uc),
 	}
 }
 
@@ -110,6 +112,11 @@ func (h *Handler) handleStreams(w http.ResponseWriter, r *http.Request) {
 
 		if !isValidSourceURL(st.SourceURL) {
 			http.Error(w, `{"error":"invalid source_url: protocol not allowed"}`, http.StatusBadRequest)
+			return
+		}
+
+		if st.SubstreamURL != "" && !isValidSourceURL(st.SubstreamURL) {
+			http.Error(w, `{"error":"invalid substream_url: protocol not allowed"}`, http.StatusBadRequest)
 			return
 		}
 
@@ -209,6 +216,15 @@ func (h *Handler) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		json.NewEncoder(w).Encode(stat)
+		return
+	}
+
+	if len(parts) >= 2 && parts[1] == "diagnostics" {
+		if _, err := checkOwnership(); err != nil {
+			http.Error(w, `{"error":"stream not found"}`, http.StatusNotFound)
+			return
+		}
+		h.diagHandler.HandleStreamDiagnostics(w, r)
 		return
 	}
 

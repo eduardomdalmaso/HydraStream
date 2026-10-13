@@ -18,7 +18,7 @@ func TestStreamServiceRegisterAndGet(t *testing.T) {
 	newStream := &domain.Stream{
 		StreamID:  "cam_backyard_01",
 		TenantID:  "tenant_beta",
-		SourceURL: "rtsp://mediamtx:8554/cam_backyard_01",
+		SourceURL: "rtsp://hydrastream:8554/cam_backyard_01",
 	}
 
 	err := service.RegisterStream(ctx, newStream)

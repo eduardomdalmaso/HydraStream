@@ -21,6 +21,7 @@ type Stream struct {
 	TenantID       string     `json:"tenant_id"`
 	StreamID       string     `json:"stream_id"`
 	SourceURL      string     `json:"source_url"`
+	SubstreamURL   string     `json:"substream_url,omitempty"`
 	DecodingEngine string     `json:"decoding_engine"`
 	Status         string     `json:"status"` // "online", "offline", "reconnecting"
 	Resolution     string     `json:"resolution"`

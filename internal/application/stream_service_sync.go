@@ -1,11 +1,10 @@
 package application
 
-func syncMediaMTXPath(streamID, sourceURL, codec string) {
-	// Replaced by native Rust hydra-engine WSP server.
-	// Ingest sessions write directly to /dev/shm, auto-attached by WSP engine.
+func syncEngineStream(streamID, sourceURL, codec string) {
+	// Native Rust hydra-engine WSP server auto-attaches directly to /dev/shm.
 }
 
-func deleteMediaMTXPath(streamID string) {
-	// Replaced by native Rust hydra-engine WSP server.
+func deleteEngineStream(streamID string) {
+	// Native Rust hydra-engine WSP server cleans up listeners on client disconnect.
 }
 

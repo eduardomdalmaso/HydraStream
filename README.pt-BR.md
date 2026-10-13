@@ -31,10 +31,13 @@ O **HydraStream** atua como um multiplexador de vídeo Headless centralizado e m
 - **Arquitetura Dual-Engine Modular:**
   - **Módulo CPU:** Usa Go/Rust + FFmpeg para alta taxa de processamento em nós puramente CPU.
   - **Módulo GPU (NVIDIA):** Usa NVDEC + CUDA IPC + NVIDIA Triton Inference Server para aceleração por hardware e passagem de tensores zero-copy na VRAM da GPU (com detecção dinâmica da RTX 5090/4090/A100).
-- **Canal Único de Ingestão:** Conecta ao MediaMTX / RTSP **1 única vez** por câmera via RFC 2326 TCP demuxing, distribuindo o fluxo internamente.
+- **Canal Único de Ingestão & Auto-Descoberta ONVIF:** Conecta ao stream RTSP **1 única vez** via RFC 2326 TCP demuxing. O probe RTSP inteligente varre automaticamente as portas ONVIF para descobrir credenciais, perfis e mapear o Substream nativo da câmera.
+- **Ingestão Nativa RTMP Push em Rust (:1935):** Servidor RTMP assíncrono integrado diretamente ao `hydra-engine`. Uma aplicação externa (OBS Studio, drone, encoder de hardware) solicita o endpoint `POST /api/v1/streams/publish`, recebe a URL RTMP e o fluxo é imediatamente demuxado para NALUs Annex-B gravados direto no `/dev/shm` e distribuídos 1:N sem overhead.
+- **Motor de Mídia Nativo em Rust (WSP :8085):** Substitui dependências externas de servidores RTSP (como MediaMTX) por um servidor WebSocket binário de alta cadência (`hydra-engine`), entregando NALUs Annex-B diretamente ao W3C WebCodecs no frontend do VMS com latência ultra-baixa (< 16ms).
+- **Transcodificação Dinâmica NVENC sob Demanda:** Fluxos de alta resolução H.265/HEVC são transcodificados dinamicamente para H.264 via hardware em qualquer GPU NVIDIA ativa (`hevc_cuvid` -> `h264_nvenc`) sem qualquer sobrecarga de CPU do servidor, com auto-desligamento inteligente quando os clientes desconectam.
 - **Integração Direta com Ultralytics & OpenCV:** Entrega matrizes prontas (`numpy.ndarray` / `cv::Mat`) diretamente para o Ultralytics YOLO (`model.predict(frame)`) ou OpenCV, eliminando o `cv2.VideoCapture`.
 - **FPS Governor Inteligente por Consumidor:** Permite que cada analítico registre seu FPS alvo (ex: Analítico A @ 2 FPS, Tracker @ 15 FPS), descartando frames sem custo de CPU.
-- **Detecção Automática de Hardware e Topologia:** Lê em tempo real os núcleos de CPU da máquina, VRAM da GPU e se adapta de ambiente standalone local para cluster Kubernetes.
+- **Detecção Automática de Hardware e Topologia:** Lê em tempo real os núcleos de CPU da máquina, VRAM da GPU NVIDIA e se adapta de ambiente standalone local para cluster Kubernetes.
 
 ---
 
@@ -42,32 +45,44 @@ O **HydraStream** atua como um multiplexador de vídeo Headless centralizado e m
 
 ```mermaid
 flowchart TD
-    subgraph Stream Ingress [Camada de Ingestão]
-        MediaMTX[MediaMTX RTSP Server :8554]
+    subgraph Stream Ingress [Camada de Ingestão & Descoberta]
         IPCam[Câmeras IP / RTSP ao Vivo]
+        RTMP_Pub[OBS / Drones / RTMP Push :1935]
+        ONVIF_Scan[Auto-Scan ONVIF Sondas Substream]
     end
 
-    subgraph Go Control Plane [Arquitetura Hexagonal Go]
+    subgraph Go Control Plane [Arquitetura Hexagonal Go :8080]
         IngestAdapter[Adaptador RTSP / TCP Demuxer]
         StreamService[Serviço de Aplicação & Telemetria Dinâmica]
-        RESTRouter[HTTP REST API /api/v1/streams]
+        RESTRouter[HTTP REST API /api/v1/streams /publish]
         WebUI[Dashboard Web UI :8080]
     end
 
-    subgraph Rust Data Plane [Data Plane Engine em Rust]
+    subgraph Rust Data Plane [Motor hydra-engine :8085 & :1935]
+        RTMPServer[Servidor RTMP Push :1935 Zero-Copy]
+        WSPServer[Servidor WSP WebSocket Binário :8085]
+        NVENC_Pool[Transcoder Pool NVENC H.265->H.264]
         SHM_Ring[Ring Buffer Lock-Free POSIX SHM /dev/shm]
         Gov[Smart Microsecond FPS Governor]
         FFI[Exportação Zero-Copy FFI C-ABI]
     end
 
-    MediaMTX -->|Sessão Única TCP| IngestAdapter
     IPCam -->|RFC 2326 Interleaved RTP| IngestAdapter
+    IPCam -.->|Auto-Probe ONVIF| ONVIF_Scan
+    RTMP_Pub -->|RTMP Handshake & Publish| RTMPServer
+    RTMPServer -->|AVCC->Annex-B Direto em Memória| SHM_Ring
+    RTMPServer -->|Broadcast Gateway| WSPServer
+    ONVIF_Scan --> StreamService
     IngestAdapter --> StreamService
     StreamService --> SHM_Ring
+    SHM_Ring --> WSPServer
+    SHM_Ring --> NVENC_Pool
     SHM_Ring --> Gov
     Gov --> FFI
 
-    subgraph Analytics Consumers [Consumidores Analíticos com Cadência Throttled]
+    subgraph Clients and Analytics [Consumidores WebCodecs e IA]
+        WSPServer -->|Protocolo WSP Binário @ WebCodecs| HydraVMS[HydraVMS / Web Player]
+        NVENC_Pool -->|WSP H.264 Transcodificado| WebBrowsers[Navegadores Legados]
         FFI -->|Matriz NumPy Zero-Copy SHM @ 2 FPS| PythonYOLO[Ultralytics YOLOv8 / YOLOv11]
         FFI -->|Matriz cv::Mat Zero-Copy SHM @ 5 FPS| OpenCV[Analíticos OpenCV / Python SDK]
         FFI -->|Handle Tensor CUDA IPC @ 30 FPS| Triton[NVIDIA Triton Inference Server]

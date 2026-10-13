@@ -31,10 +31,13 @@ In scaled computer vision and video analytics pipelines, running multiple downst
 - **Modular Dual-Engine Architecture:**
   - **CPU Module:** Uses Go/Rust + FFmpeg for high-throughput software decoding on CPU nodes.
   - **GPU Module (NVIDIA):** Uses NVDEC + CUDA IPC + NVIDIA Triton Inference Server for hardware acceleration and zero-copy tensor passing directly on GPU memory (supports real-time hardware detection for RTX 5090/4090/A100).
-- **Single Ingest Pipe:** Connects to MediaMTX / RTSP **once** per stream with native RFC 2326 TCP demuxing, multiplexing the raw feed internally without redundant network sessions.
+- **Single Ingest Pipe & Smart ONVIF Auto-Discovery:** Connects to RTSP streams **once** with native RFC 2326 TCP demuxing. The intelligent RTSP probe auto-scans ONVIF ports in parallel to discover device credentials, media profiles, and automatic camera Substreams.
+- **Native Rust RTMP Push Ingest (:1935):** Asynchronous RTMP server directly embedded in `hydra-engine`. External applications (OBS Studio, drones, hardware encoders) request `POST /api/v1/streams/publish`, get an RTMP ingest URL, and incoming video chunks are demuxed to Annex-B NALUs written directly to `/dev/shm` and distributed 1:N with zero overhead.
+- **Native Rust Media Engine (WSP :8085):** Replaces legacy external RTSP relays (such as MediaMTX) with a high-throughput binary WebSocket server (`hydra-engine`), delivering raw Annex-B NALUs directly to W3C WebCodecs frontend players with ultra-low latency (< 16ms).
+- **Dynamic On-Demand NVENC Transcoding:** High-resolution H.265/HEVC streams are dynamically transcoded to H.264 via dedicated hardware on any active NVIDIA GPU (`hevc_cuvid` -> `h264_nvenc`) with 0% server CPU overhead and automatic teardown when consumers disconnect.
 - **Direct Ultralytics & OpenCV Bridge:** Delivers pre-decoded matrices (`numpy.ndarray` / `cv::Mat`) directly into Ultralytics YOLO (`model.predict(frame)`) or standard OpenCV code, eliminating `VideoCapture` completely.
 - **Smart Per-Consumer FPS Throttling:** Allows each analytics worker to register its desired sampling rate (e.g., Worker A @ 2 FPS, Worker B @ 15 FPS), skipping unneeded decoding/fan-out.
-- **Dynamic Hardware & Node Discovery:** Automatically detects host CPU cores, actual GPU model/VRAM, and scales seamlessly from single-host standalone to distributed Kubernetes clusters.
+- **Dynamic Hardware & Node Discovery:** Automatically detects host CPU cores, active NVIDIA GPU model/VRAM, and scales seamlessly from single-host standalone to distributed Kubernetes clusters.
 
 ---
 
@@ -42,32 +45,44 @@ In scaled computer vision and video analytics pipelines, running multiple downst
 
 ```mermaid
 flowchart TD
-    subgraph Stream Ingress [Ingest Layer]
-        MediaMTX[MediaMTX RTSP Server :8554]
+    subgraph Stream Ingress [Ingest Layer & Discovery]
         IPCam[Live RTSP / IP Cameras]
+        RTMP_Pub[OBS / Drones / RTMP Push :1935]
+        ONVIF_Scan[Auto-Scan ONVIF S probes Substream]
     end
 
-    subgraph Go Control Plane [HydraStream Hexagonal Architecture]
+    subgraph Go Control Plane [HydraStream Hexagonal Architecture :8080]
         IngestAdapter[RTSP / TCP Demuxer Adapter]
         StreamService[Stream Application Service & Dynamic Telemetry]
-        RESTRouter[HTTP REST API /api/v1/streams]
+        RESTRouter[HTTP REST API /api/v1/streams /publish]
         WebUI[Dashboard Web UI :8080]
     end
 
-    subgraph Rust Data Plane [HydraStream Data Engine]
+    subgraph Rust Data Plane [Engine hydra-engine :8085 & :1935]
+        RTMPServer[Native RTMP Push Server :1935 Zero-Copy]
+        WSPServer[Binary WebSocket WSP Server :8085]
+        NVENC_Pool[NVENC Transcoder Pool H.265->H.264]
         SHM_Ring[Lock-Free POSIX SHM Ring Buffer /dev/shm]
         Gov[Smart Microsecond FPS Governor]
         FFI[C-ABI FFI Zero-Copy Export]
     end
 
-    MediaMTX -->|Single TCP Session| IngestAdapter
     IPCam -->|RFC 2326 Interleaved RTP| IngestAdapter
+    IPCam -.->|Auto-Probe ONVIF| ONVIF_Scan
+    RTMP_Pub -->|RTMP Handshake & Publish| RTMPServer
+    RTMPServer -->|AVCC->Annex-B Direct to Memory| SHM_Ring
+    RTMPServer -->|Broadcast Gateway| WSPServer
+    ONVIF_Scan --> StreamService
     IngestAdapter --> StreamService
     StreamService --> SHM_Ring
+    SHM_Ring --> WSPServer
+    SHM_Ring --> NVENC_Pool
     SHM_Ring --> Gov
     Gov --> FFI
 
-    subgraph Analytics Consumers [Throttled Analytics Workers]
+    subgraph Clients and Analytics [WebCodecs and AI Consumers]
+        WSPServer -->|Binary WSP Protocol @ WebCodecs| HydraVMS[HydraVMS / Web Player]
+        NVENC_Pool -->|Transcoded H.264 WSP Stream| WebBrowsers[Legacy Browsers]
         FFI -->|Zero-Copy SHM NumPy Array @ 2 FPS| PythonYOLO[Ultralytics YOLOv8 / YOLOv11]
         FFI -->|Zero-Copy SHM cv::Mat @ 5 FPS| OpenCV[OpenCV Analytics / Python SDK]
         FFI -->|CUDA IPC Tensor Handle @ 30 FPS| Triton[NVIDIA Triton Inference Server]

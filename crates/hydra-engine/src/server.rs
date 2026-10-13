@@ -198,7 +198,7 @@ fn parse_query_param(uri: &str, param: &str) -> Option<String> {
     None
 }
 
-pub(crate) async fn handle_connection(
+pub async fn handle_connection(
     stream: TcpStream,
     peer_addr: SocketAddr,
     registry: Arc<StreamRegistry>,
@@ -224,25 +224,38 @@ pub(crate) async fn handle_connection(
 
     let requested_codec = parse_query_param(&requested_uri, "codec")
         .unwrap_or_else(|| "raw".to_string());
+    let requested_profile = parse_query_param(&requested_uri, "profile")
+        .unwrap_or_else(|| "main".to_string());
 
-    let stream_entry = match registry.get(&stream_id) {
+    let target_stream_id = if requested_profile == "sub" {
+        let sub_id = format!("{}_sub", stream_id);
+        if registry.get(&sub_id).is_some() {
+            sub_id
+        } else {
+            stream_id.clone()
+        }
+    } else {
+        stream_id.clone()
+    };
+
+    let stream_entry = match registry.get(&target_stream_id) {
         Some(e) => e,
         None => {
-            let _ = ws_tx.send(Message::Text(format!(r#"{{"error":"stream_not_found","stream_id":"{}"}}"#, stream_id))).await;
+            let _ = ws_tx.send(Message::Text(format!(r#"{{"error":"stream_not_found","stream_id":"{}"}}"#, target_stream_id))).await;
             let _ = ws_tx.send(Message::Close(None)).await;
             return Ok(());
         }
     };
 
     println!(
-        "📡 [Hydra WSP] Client {} connected to '{}' (requested codec: {})",
-        peer_addr, stream_id, requested_codec
+        "📡 [Hydra WSP] Client {} connected to '{}' (profile: {}, requested codec: {})",
+        peer_addr, target_stream_id, requested_profile, requested_codec
     );
 
     // Branch 1: Transcoding requested (H.265 stream requesting H.264)
     if stream_entry.codec == StreamCodec::H265 && requested_codec == "h264" {
         let transcode_pool = registry.transcode_pool();
-        let worker = match transcode_pool.get_or_spawn(&stream_id) {
+        let worker = match transcode_pool.get_or_spawn(&target_stream_id) {
             Ok(w) => w,
             Err(e) => {
                 let _ = ws_tx.send(Message::Text(format!(r#"{{"error":"transcode_unavailable","details":"{}"}}"#, e))).await;

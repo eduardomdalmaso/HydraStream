@@ -43,5 +43,10 @@ type StreamUseCase interface {
 	HandleWHEPOffer(ctx context.Context, streamID string, sdpOffer string) (*domain.WHEPAnswer, error)
 	HandleWHEPPatch(ctx context.Context, streamID, sessionID string, patchData string) error
 	HandleWHEPDelete(ctx context.Context, streamID, sessionID string) error
+
+	// Stream Diagnostics & Anomaly Detection
+	GetStreamDiagnostics(ctx context.Context, streamID string) (*domain.AppError, error)
+	GetSystemDiagnostics(ctx context.Context) ([]*domain.AppError, error)
 }
+
 
