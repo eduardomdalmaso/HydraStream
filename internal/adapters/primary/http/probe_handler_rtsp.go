@@ -211,7 +211,7 @@ func (h *Handler) probeRTMP(w http.ResponseWriter, req StreamProbeRequest) {
 		return
 	}
 
-	addr := fmt.Sprintf("%s:%d", host, port)
+	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	start := time.Now()
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 	if err != nil {

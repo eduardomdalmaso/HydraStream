@@ -7,8 +7,8 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![Rust](https://img.shields.io/badge/Rust-1.80+-000000?logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![NVIDIA GPU](https://img.shields.io/badge/NVIDIA-RTX%205090%20%7C%20NVDEC-76B900?logo=nvidia&logoColor=white)](https://developer.nvidia.com/)
-[![MediaMTX](https://img.shields.io/badge/MediaMTX-v1.20.1%20Inclu%C3%ADdo-00599C)](https://github.com/bluenviron/mediamtx)
+[![NVIDIA GPU](https://img.shields.io/badge/NVIDIA-NVENC%20%7C%20CUDA-76B900?logo=nvidia&logoColor=white)](https://developer.nvidia.com/)
+[![Motor WSP Rust](https://img.shields.io/badge/Motor%20WSP-Rust%20%7C%20Tokio-orange)](crates/hydra-engine)
 
 ---
 
@@ -179,17 +179,17 @@ HydraStream/
 
 ## Guia de Início Rápido
 
-### 1. Iniciar o HydraStream
+### 1. Iniciar o HydraStream (Control Plane & Motor WSP Rust)
 ```bash
 make dev
 ```
-> Inicia o Data Plane Engine em Go com endpoints REST e Telemetria em **`http://localhost:8080`**.
+> Inicia o Control Plane em Go em **`http://localhost:8080`** e o Motor WSP embutido em Rust em **`ws://localhost:8085`**.
 
-### 2. Iniciar o Servidor MediaMTX Local (Binário Incluído)
+### 2. Iniciar o Servidor WSP Rust Standalone
 ```bash
-make mediamtx
+make wsp-server
 ```
-> Inicia o servidor MediaMTX nas portas `8554` (RTSP), `1935` (RTMP), `8888` (HLS) e `8889` (WebRTC).
+> Inicia o servidor Tokio WebSocket dedicado para entrega binária de fluxos WSP com aceleração NVENC dinâmica na porta `8085`.
 
 ### 3. Transmitir um Padrão de Teste RTSP
 ```bash
@@ -202,13 +202,11 @@ make stream-sample
 make test
 ```
 
-### 5. Ingestão Genérica 1:N e Decodificação Contínua em Rust
+### 5. Ingestão Genérica 1:N e Entrega Contínua em Rust
 O HydraStream opera automaticamente com entrega simultânea **1 para N**:
-- **WebRTC WHEP (`http://localhost:8889/<stream_id>/whep`)**: Para exibição instantânea no frontend/navegador (< 50ms).
-- **Zero-Copy SHM (`/dev/shm/hydra_<stream_id>`)**: Decodificado em tempo real pelo motor Rust com aceleração NVDEC/GPU, acessível diretamente pelos modelos YOLO e scripts de visão computacional.
-- **RTSP Relay (`rtsp://127.0.0.1:8554/<stream_id>`)**: Para players legados e gravadores.
-
-O hook global em `mediamtx.yml` (`pathDefaults.runOnReady`) mapeia dinamicamente qualquer fluxo `$MTX_PATH` para o buffer compartilhado na memória RAM sem necessidade de cadastros hardcoded.
+- **WSP Binário (`ws://localhost:8085/live/<stream_id>`)**: Exibição instantânea via WebCodecs (< 50ms de latência) com zero sobrecarga de negociação WebRTC.
+- **NVENC Dinâmico (`ws://localhost:8085/live/<stream_id>?codec=h264`)**: Transcodificação sob demanda acelerada por hardware em GPUs NVIDIA para fontes H.265.
+- **Zero-Copy SHM (`/dev/shm/hydra_<stream_id>`)**: Decodificado em tempo real pelo motor Rust, acessível diretamente pelos modelos YOLO e scripts de visão computacional.
 
 ### 6. Executar o Benchmark de Zero-Copy em Rust
 ```bash

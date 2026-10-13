@@ -18,7 +18,6 @@ mkdir -p "${BUILD_ROOT}/samples"
 mkdir -p "${BUILD_ROOT}/recordings"
 
 cp bin/hydrastream.exe "${BUILD_ROOT}/"
-cp mediamtx.yml "${BUILD_ROOT}/"
 cp README.md "${BUILD_ROOT}/"
 cp -r samples/* "${BUILD_ROOT}/samples/" 2>/dev/null || true
 

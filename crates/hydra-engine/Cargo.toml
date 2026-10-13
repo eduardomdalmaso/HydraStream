@@ -19,11 +19,13 @@ memmap2 = "0.9"
 crossbeam-channel = "0.5"
 atomic-wait = "1.1"
 parking_lot = "0.12"
-tokio = { version = "1.0", features = ["sync", "rt", "rt-multi-thread", "macros", "time", "signal"] }
+tokio = { version = "1.0", features = ["sync", "rt", "rt-multi-thread", "macros", "time", "signal", "net", "io-util", "process"] }
 bytes = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 signal-hook = "0.3"
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
 
 [dev-dependencies]
 tempfile = "3.10"

@@ -22,8 +22,7 @@ mkdir -p "${BUILD_ROOT}/etc/systemd/system"
 
 # Copy binaries & assets
 cp bin/hydrastream "${BUILD_ROOT}/opt/hydrastream/"
-cp bin/mediamtx "${BUILD_ROOT}/opt/hydrastream/bin/"
-cp mediamtx.yml "${BUILD_ROOT}/opt/hydrastream/"
+cp target/release/hydra-engine "${BUILD_ROOT}/opt/hydrastream/bin/" 2>/dev/null || cp bin/hydra-engine "${BUILD_ROOT}/opt/hydrastream/bin/"
 cp -r samples/* "${BUILD_ROOT}/opt/hydrastream/samples/" 2>/dev/null || true
 
 # Systemd Unit File
@@ -41,8 +40,8 @@ Restart=always
 RestartSec=3
 
 Environment=PORT=8080
+Environment=WSP_PORT=8085
 Environment=NATS_URL=nats://localhost:4222
-Environment=MEDIAMTX_WHEP_URL=http://localhost:8889
 Environment=JWT_SECRET=super-secret-key-that-is-at-least-32-chars-long-for-production!
 
 LimitNOFILE=65536
@@ -68,7 +67,7 @@ EOF
 cat << 'EOF' > "${BUILD_ROOT}/DEBIAN/postinst"
 #!/bin/sh
 set -e
-chmod +x /opt/hydrastream/hydrastream /opt/hydrastream/bin/mediamtx
+chmod +x /opt/hydrastream/hydrastream /opt/hydrastream/bin/hydra-engine
 systemctl daemon-reload
 systemctl enable --now hydrastream.service || true
 echo "✅ HydraStream installed and started on http://localhost:8080"

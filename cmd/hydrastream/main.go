@@ -40,7 +40,7 @@ func main() {
 	mux := http.NewServeMux()
 	apiHandler.RegisterRoutes(mux)
 
-	mtxCmd := startEmbeddedMediaMTX()
+	wspCmd := startEmbeddedWspEngine()
 
 	go func() {
 		time.Sleep(1 * time.Second)
@@ -89,11 +89,11 @@ func main() {
 	if natsPub != nil {
 		natsPub.Close()
 	}
-	if mtxCmd != nil && mtxCmd.Process != nil {
-		log.Println("🛑 [HydraStream] Terminating embedded MediaMTX server...")
-		_ = mtxCmd.Process.Signal(syscall.SIGINT)
+	if wspCmd != nil && wspCmd.Process != nil {
+		log.Println("🛑 [HydraStream] Terminating embedded Rust WSP Engine...")
+		_ = wspCmd.Process.Signal(syscall.SIGINT)
 		time.Sleep(500 * time.Millisecond)
-		_ = mtxCmd.Process.Kill()
+		_ = wspCmd.Process.Kill()
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

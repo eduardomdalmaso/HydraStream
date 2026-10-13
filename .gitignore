@@ -7,10 +7,8 @@ _agents/
 
 # Binary & Build Artifacts
 bin/
-hydrastream
-hydrastream.exe*
-mediamtx
-mediamtx.yml
+/hydrastream
+/hydrastream.exe*
 target/
 *.so
 *.a

@@ -11,6 +11,9 @@ pub mod resilience;
 pub mod decorator;
 pub mod isolated;
 pub mod ffi;
+pub mod wsp;
+pub mod transcode;
+pub mod server;
 
 pub use shm::{ShmWriter, ShmReader, ShmHeader, SlotHeader};
 pub use governor::FpsGovernor;
@@ -31,6 +34,9 @@ pub use coroutine::{SymmetricCoroutine, CoroutineYield, NalClassifierCoroutine, 
 pub use resilience::{StreamCircuitBreaker, CircuitState};
 pub use decorator::{TelemetryFuture, TelemetryExt, FutureMetricsSink};
 pub use isolated::{SyncGatewayBridge, SyncReceiver};
+pub use wsp::{pack_wsp_frame, pack_wsp_frame_into, unpack_wsp_frame, WspFrameRef, WSP_FRAME_KEYFRAME, WSP_FRAME_DELTA, WSP_HEADER_LEN};
+pub use transcode::{TranscodeWorker, TranscodePool, TranscodeError, detect_nvidia_gpu};
+pub use server::{WspServer, StreamRegistry, StreamCodec, StreamEntry};
 
 #[cfg(test)]
 mod tests {
@@ -881,6 +887,79 @@ mod tests {
         assert_eq!(received.frame_id, 999);
 
         sync_bridge.shutdown_sync();
+    }
+
+    #[test]
+    fn test_stream_registry_and_nvidia_detection() {
+        let registry = StreamRegistry::new();
+        let hub = Arc::new(BroadcastHub::new(16));
+        let gateway = Arc::new(AsyncStreamGateway::new(hub, 16));
+
+        registry.register("cam_entrance", StreamCodec::H264, gateway);
+        let entry = registry.get("cam_entrance").expect("Stream entry should exist");
+        assert_eq!(entry.stream_id, "cam_entrance");
+        assert_eq!(entry.codec, StreamCodec::H264);
+
+        registry.unregister("cam_entrance");
+        assert!(registry.get("cam_entrance").is_none());
+
+        // Dynamic GPU detection should not panic
+        let gpu = detect_nvidia_gpu();
+        if let Some(gpu_name) = gpu {
+            println!("  [TEST] Detected real NVIDIA GPU: {}", gpu_name);
+            assert!(!gpu_name.is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn test_wsp_server_frame_delivery() {
+        use futures_util::StreamExt;
+        use crate::wsp::unpack_wsp_frame;
+
+        let registry = Arc::new(StreamRegistry::new());
+        let hub = Arc::new(BroadcastHub::new(16));
+        let gateway = Arc::new(AsyncStreamGateway::new(hub, 16));
+
+        registry.register("test_live", StreamCodec::H264, gateway.clone());
+
+        // Bind ephemeral port
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("bind failed");
+        let local_addr = listener.local_addr().expect("local addr");
+        let reg_clone = registry.clone();
+
+        // Spawn test server
+        tokio::spawn(async move {
+            if let Ok((stream, peer_addr)) = listener.accept().await {
+                let _ = crate::server::handle_connection(stream, peer_addr, reg_clone).await;
+            }
+        });
+
+        // Pre-dispatch keyframe into gateway (so initial keyframe is ready)
+        let keyframe_payload = FramePayload::new_host(
+            1,
+            555_000,
+            1920,
+            1080,
+            FLAG_KEYFRAME,
+            BIT_WEBSOCKET,
+            vec![0x00, 0x00, 0x00, 0x01, 0x67, 0x42, 0x00, 0x1f],
+        );
+        gateway.dispatch_frame(keyframe_payload, FLAG_KEYFRAME).expect("dispatch keyframe");
+
+        // Connect client
+        let ws_url = format!("ws://{}/live/test_live", local_addr);
+        let (ws_stream, _) = tokio_tungstenite::connect_async(ws_url).await.expect("ws connect failed");
+        let (_, mut rx) = ws_stream.split();
+
+        // Expect binary WSP frame
+        if let Some(Ok(tokio_tungstenite::tungstenite::Message::Binary(bin_data))) = rx.next().await {
+            let unpacked = unpack_wsp_frame(&bin_data).expect("unpack WSP frame");
+            assert!(unpacked.is_keyframe);
+            assert_eq!(unpacked.timestamp_us, 555_000);
+            assert_eq!(unpacked.payload, &[0x00, 0x00, 0x00, 0x01, 0x67, 0x42, 0x00, 0x1f]);
+        } else {
+            panic!("Expected binary WSP frame from server");
+        }
     }
 }
 

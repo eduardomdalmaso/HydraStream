@@ -11,6 +11,7 @@ use hydra_engine::shm::{ShmReader, ShmWriter};
 fn print_usage() {
     println!("HydraStream Zero-Copy Engine");
     println!("Usage:");
+    println!("  hydra-engine server [--port 8085]");
     println!("  hydra-engine ingest --id <stream_id> [--width 1920] [--height 1080] [--format 1] [--slots 16]");
     println!("  hydra-engine benchmark");
 }
@@ -200,6 +201,51 @@ fn run_ingest(args: &[String]) {
     println!("🛑 [HydraStream Rust Ingest] Stopped. Processed {} frames ({:.1} avg FPS).", frame_count, avg_fps);
 }
 
+fn run_server(args: &[String]) {
+    let mut port = 8085;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--port" | "-p" => {
+                if i + 1 < args.len() {
+                    port = args[i + 1].parse().unwrap_or(8085);
+                    i += 1;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+
+    if let Ok(env_port) = env::var("WSP_PORT") {
+        if let Ok(p) = env_port.parse() {
+            port = p;
+        }
+    }
+
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("Failed to build Tokio runtime for WSP Server");
+
+    rt.block_on(async move {
+        let addr = format!("0.0.0.0:{}", port).parse().expect("Invalid socket address");
+        let registry = Arc::new(hydra_engine::server::StreamRegistry::new());
+        let server = hydra_engine::server::WspServer::new(addr, registry);
+
+        if let Some(gpu) = hydra_engine::transcode::detect_nvidia_gpu() {
+            println!("⚡ [Hydra WSP Engine] NVIDIA Hardware Acceleration Active: {}", gpu);
+        } else {
+            println!("ℹ️ [Hydra WSP Engine] NVIDIA GPU not detected. Passthrough mode active.");
+        }
+
+        println!("🚀 [Hydra WSP Engine] Starting server on ws://0.0.0.0:{}", port);
+        if let Err(e) = server.run().await {
+            eprintln!("❌ [Hydra WSP Engine] Server error: {}", e);
+        }
+    });
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
@@ -208,6 +254,7 @@ fn main() {
     }
 
     match args[1].as_str() {
+        "server" => run_server(&args[2..]),
         "ingest" => run_ingest(&args[2..]),
         "benchmark" => run_benchmark(),
         "--help" | "-h" | "help" => print_usage(),

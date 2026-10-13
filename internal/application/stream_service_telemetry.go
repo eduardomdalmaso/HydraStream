@@ -61,6 +61,7 @@ func (s *StreamService) GetHealth(ctx context.Context) (*domain.SystemHealth, er
 		StartedAt:     s.startTime,
 		Services: domain.ServiceStatus{
 			RTSPIngestor:    "ONLINE",
+			WSPEngine:       "ONLINE",
 			MediaMTXRelay:   "ONLINE",
 			POSIXSHMBuffers: "ONLINE",
 			NATSEventMesh:   "ONLINE",

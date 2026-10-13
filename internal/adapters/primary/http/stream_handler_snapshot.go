@@ -169,7 +169,7 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 	_, _ = w.Write(standbyData)
 }
 
-func generateStandbySnapshot(streamID string) []byte {
+func generateStandbySnapshot(_ string) []byte {
 	width, height := 640, 360
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 	bg := color.RGBA{R: 11, G: 14, B: 20, A: 255}

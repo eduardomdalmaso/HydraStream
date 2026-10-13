@@ -1,44 +1,38 @@
 # HydraStream Development & Build Automation Makefile
 
-.PHONY: dev dev-all build test cargo-test benchmark mediamtx deps-mediamtx stream-sample clean help
+.PHONY: dev dev-all build build-engine test cargo-test benchmark wsp-server stream-sample clean help
 
 # Default target
 all: dev
 
-# Ensure MediaMTX binary is installed
-deps-mediamtx:
-	@if [ ! -f ./bin/mediamtx ] && [ ! -f ./bin/mediamtx.exe ]; then \
-		echo "📥 Downloading MediaMTX v1.21.1 for Linux amd64..."; \
-		mkdir -p bin; \
-		curl -fsSL -L "https://github.com/bluenviron/mediamtx/releases/download/v1.21.1/mediamtx_v1.21.1_linux_amd64.tar.gz" -o /tmp/mediamtx.tar.gz && \
-		tar -xzf /tmp/mediamtx.tar.gz -C bin/ mediamtx mediamtx.yml && \
-		[ -f mediamtx.yml ] || cp bin/mediamtx.yml ./mediamtx.yml && \
-		chmod +x bin/mediamtx && \
-		echo "✅ MediaMTX installed in bin/mediamtx"; \
-	fi
+# Build native Rust Data Plane Engine
+build-engine:
+	@echo "📦 Building Rust Data Plane Engine (hydra-engine)..."
+	@cargo build --release --manifest-path crates/hydra-engine/Cargo.toml
+	@mkdir -p bin
+	@cp target/release/hydra-engine bin/ 2>/dev/null || cp target/release/hydra-engine.exe bin/ 2>/dev/null || true
+	@echo "✅ Native Rust Engine built in bin/hydra-engine"
 
 # Run HydraStream in Live Development Mode
-dev: deps-mediamtx
+dev: build-engine
 	@echo "🚀 Starting HydraStream Data Plane Engine..."
-	@echo "📡 REST API & Telemetry endpoints active on port 8080"
+	@echo "📡 REST API active on port 8080 | Rust WSP Server on port 8085"
 	go run ./cmd/hydrastream
 
-# Run MediaMTX RTSP Server binary
-mediamtx: deps-mediamtx
-	@echo "📡 Starting MediaMTX RTSP Server (v1.21.1) on ports 8554 (RTSP), 1935 (RTMP), 8888 (HLS), 8889 (WebRTC)..."
-	./bin/mediamtx
+# Run Dedicated Rust WSP Server standalone
+wsp-server: build-engine
+	@echo "📡 Starting Dedicated Rust WSP Server on port 8085..."
+	./bin/hydra-engine server --port 8085
 
-# Publish a sample RTSP test feed to MediaMTX
+# Publish a sample RTSP test feed
 stream-sample:
 	@echo "🎥 Publishing test camera video pattern to rtsp://localhost:8554/tenant_company_alpha/cam_entrance_01..."
 	ffmpeg -re -f lavfi -i testsrc=size=1920x1080:rate=30 -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -f rtsp rtsp://localhost:8554/tenant_company_alpha/cam_entrance_01
 
 # Build final production binary and Rust data plane
-build: deps-mediamtx
-	@echo "📦 Building Rust Data Plane Engine..."
-	cargo build --release --manifest-path crates/hydra-engine/Cargo.toml
+build: build-engine
 	@echo "📦 Building Go Control Plane binary in bin/hydrastream..."
-	mkdir -p bin
+	@mkdir -p bin
 	go build -o bin/hydrastream ./cmd/hydrastream
 
 # Run all Go and Rust tests
