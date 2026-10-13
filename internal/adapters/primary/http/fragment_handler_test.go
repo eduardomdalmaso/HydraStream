@@ -109,4 +109,22 @@ func TestFragmentUploadAndDownload(t *testing.T) {
 	if !bytes.Equal(getRR.Body.Bytes(), fakeVideoData) {
 		t.Fatalf("downloaded fragment data mismatch")
 	}
+
+	// 4. Test Timezone Queries (RFC3339 with offset -03:00, SQL format, etc.)
+	tzReq := httptest.NewRequest(http.MethodGet, "/api/v1/streams/cam_test_01/recordings/fragments?start=2026-01-01T00:00:00-03:00&end=2030-01-01T00:00:00Z", nil)
+	tzReq.Header.Set("Authorization", "Bearer "+token)
+	tzRR := httptest.NewRecorder()
+	mux.ServeHTTP(tzRR, tzReq)
+	if tzRR.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK on timezone query, got %d", tzRR.Code)
+	}
+
+	sqlReq := httptest.NewRequest(http.MethodGet, "/api/v1/streams/cam_test_01/recordings/fragments?start=2026-01-01%2000:00:00", nil)
+	sqlReq.Header.Set("Authorization", "Bearer "+token)
+	sqlRR := httptest.NewRecorder()
+	mux.ServeHTTP(sqlRR, sqlReq)
+	if sqlRR.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK on SQL timestamp format query, got %d", sqlRR.Code)
+	}
 }
+

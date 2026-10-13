@@ -197,13 +197,8 @@ func (h *FragmentHandler) handleUploadFragment(w http.ResponseWriter, r *http.Re
 }
 
 func (h *FragmentHandler) handleListFragments(w http.ResponseWriter, r *http.Request, streamID string) {
-	var start, end time.Time
-	if s := r.URL.Query().Get("start"); s != "" {
-		start, _ = time.Parse(time.RFC3339, s)
-	}
-	if e := r.URL.Query().Get("end"); e != "" {
-		end, _ = time.Parse(time.RFC3339, e)
-	}
+	start := parseQueryTime(r.URL.Query().Get("start"))
+	end := parseQueryTime(r.URL.Query().Get("end"))
 	limit := 50
 	if l := r.URL.Query().Get("limit"); l != "" {
 		fmt.Sscanf(l, "%d", &limit)
@@ -284,3 +279,32 @@ func (h *FragmentHandler) handleFragmentByID(w http.ResponseWriter, r *http.Requ
 
 	http.Error(w, `{"error":"fragment data unavailable"}`, http.StatusNotFound)
 }
+
+func parseQueryTime(s string) time.Time {
+	if s == "" {
+		return time.Time{}
+	}
+	// 1. RFC3339 / ISO8601 with timezone (e.g. 2026-10-13T08:00:00Z or 2026-10-13T08:00:00-03:00)
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t.UTC()
+	}
+	// 2. ISO8601 without timezone
+	if t, err := time.Parse("2006-01-02T15:04:05", s); err == nil {
+		return t.UTC()
+	}
+	// 3. SQL timestamp format (e.g. 2026-10-13 08:00:00)
+	if t, err := time.Parse("2006-01-02 15:04:05", s); err == nil {
+		return t.UTC()
+	}
+	// 4. Date only format
+	if t, err := time.Parse("2006-01-02", s); err == nil {
+		return t.UTC()
+	}
+	// 5. Unix timestamp in seconds
+	var sec int64
+	if _, err := fmt.Sscanf(s, "%d", &sec); err == nil && sec > 1000000000 {
+		return time.Unix(sec, 0).UTC()
+	}
+	return time.Time{}
+}
+

@@ -51,10 +51,14 @@ func (f *RecordingFragment) Validate() error {
 		}
 	}
 	if f.StartTime.IsZero() {
-		f.StartTime = time.Now().Add(-time.Duration(f.DurationSeconds * float64(time.Second)))
+		f.StartTime = time.Now().UTC().Add(-time.Duration(f.DurationSeconds * float64(time.Second)))
+	} else {
+		f.StartTime = f.StartTime.UTC()
 	}
 	if f.EndTime.IsZero() {
 		f.EndTime = f.StartTime.Add(time.Duration(f.DurationSeconds * float64(time.Second)))
+	} else {
+		f.EndTime = f.EndTime.UTC()
 	}
 	if f.EndTime.Before(f.StartTime) {
 		return ErrInvalidFragmentTimes
