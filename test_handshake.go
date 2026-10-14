@@ -93,5 +93,6 @@ func main() {
 		}
 	}
 
-	fmt.Printf("DESCRIBE Response Status:\n%s\n", strings.Split(descHeaders, "\r\n")[0])
+	fmt.Printf("Challenge: %s\nAuth: %s\nDescHeaders:\n%s\n", challenge, auth, descHeaders)
 }
+
