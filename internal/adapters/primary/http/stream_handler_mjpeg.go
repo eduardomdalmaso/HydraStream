@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -97,6 +98,17 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, st *domain
 	}
 
 	var urlsToTry []string
+	if sourceURL != "" && strings.HasPrefix(strings.ToLower(sourceURL), "rtsp://") && !strings.Contains(sourceURL, "localhost:") && !strings.Contains(sourceURL, "127.0.0.1:") {
+		var user, pass string
+		if u, errP := url.Parse(sourceURL); errP == nil && u.User != nil {
+			user = u.User.Username()
+			pass, _ = u.User.Password()
+		}
+		if proxyURL, cleanup, errProxy := startRTSPProxyServer(ctx, sourceURL, user, pass); errProxy == nil {
+			defer cleanup()
+			urlsToTry = append(urlsToTry, proxyURL)
+		}
+	}
 	if sourceURL != "" && !strings.Contains(sourceURL, "localhost:8554") {
 		urlsToTry = append(urlsToTry, sourceURL)
 	}
@@ -127,6 +139,7 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, st *domain
 				"-fflags", "nobuffer+discardcorrupt",
 				"-flags", "low_delay",
 				"-rtsp_transport", "tcp",
+				"-allowed_media_types", "video",
 				"-timeout", "5000000",
 				"-i", targetURL,
 				"-an",

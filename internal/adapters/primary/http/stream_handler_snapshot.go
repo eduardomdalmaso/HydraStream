@@ -98,24 +98,19 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 		}
 	}
 
-	// 3. If not refresh, deliver cached file immediately
+	// 3. If not refresh, deliver cached file immediately (only if real snapshot > 20KB)
 	if !isRefresh {
-		if data, err := os.ReadFile(samplePath); err == nil && len(data) > 0 {
-			_, _ = w.Write(data)
-			return
-		}
-		altMatches, _ := filepath.Glob(fmt.Sprintf("samples/*%s*.jpg", cleanBase))
-		for _, alt := range altMatches {
-			if data, err := os.ReadFile(alt); err == nil && len(data) > 0 {
+		if fi, errStat := os.Stat(samplePath); errStat == nil && fi.Size() > 20000 {
+			if data, err := os.ReadFile(samplePath); err == nil && len(data) > 0 {
 				_, _ = w.Write(data)
 				return
 			}
 		}
 	}
 
-	if _, errStat := os.Stat(samplePath); os.IsNotExist(errStat) {
-		if probeData, errP := os.ReadFile(filepath.Join("samples", "latest_probe.jpg")); errP == nil && len(probeData) > 0 {
-			if fiP, errStatP := os.Stat(filepath.Join("samples", "latest_probe.jpg")); errStatP == nil && time.Since(fiP.ModTime()) < 60*time.Second {
+	if fi, errStat := os.Stat(samplePath); os.IsNotExist(errStat) || (errStat == nil && fi.Size() <= 20000) {
+		if probeData, errP := os.ReadFile(filepath.Join("samples", "latest_probe.jpg")); errP == nil && len(probeData) > 20000 {
+			if fiP, errStatP := os.Stat(filepath.Join("samples", "latest_probe.jpg")); errStatP == nil && time.Since(fiP.ModTime()) < 120*time.Second {
 				_ = os.WriteFile(samplePath, probeData, 0644)
 				_, _ = w.Write(probeData)
 				return
@@ -138,14 +133,29 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 			"-i", u, "-update", "1", "-frames:v", "1", "-q:v", "2", "-y", samplePath)
 		proc.SetHideWindow(snapCmd)
 		if err := snapCmd.Run(); err == nil {
-			if data, errRead := os.ReadFile(samplePath); errRead == nil && len(data) > 0 {
+			if data, errRead := os.ReadFile(samplePath); errRead == nil && len(data) > 20000 {
 				_, _ = w.Write(data)
 				return
 			}
 		}
 	}
 
-	if data, err := os.ReadFile(samplePath); err == nil && len(data) > 0 {
+	// 4. Try Native Digest Proxy (resolves Hikvision OPTIONS 401 bug)
+	if sourceURL != "" && strings.HasPrefix(strings.ToLower(sourceURL), "rtsp://") {
+		var user, pass string
+		if u, errParse := url.Parse(sourceURL); errParse == nil && u.User != nil {
+			user = u.User.Username()
+			pass, _ = u.User.Password()
+		}
+		if errProxy := captureSnapshotWithNativeDigestProxy(sourceURL, user, pass, samplePath, 6*time.Second); errProxy == nil {
+			if data, errRead := os.ReadFile(samplePath); errRead == nil && len(data) > 20000 {
+				_, _ = w.Write(data)
+				return
+			}
+		}
+	}
+
+	if data, err := os.ReadFile(samplePath); err == nil && len(data) > 20000 {
 		_, _ = w.Write(data)
 		return
 	}
@@ -170,7 +180,7 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 				cancel()
 				if errProbe == nil && dev != nil && dev.SnapshotURL != "" && strings.HasPrefix(dev.SnapshotURL, "data:image/jpeg;base64,") {
 					b64 := strings.TrimPrefix(dev.SnapshotURL, "data:image/jpeg;base64,")
-					if rawBytes, errDec := base64.StdEncoding.DecodeString(b64); errDec == nil && len(rawBytes) > 0 {
+					if rawBytes, errDec := base64.StdEncoding.DecodeString(b64); errDec == nil && len(rawBytes) > 20000 {
 						_ = os.WriteFile(samplePath, rawBytes, 0644)
 						_, _ = w.Write(rawBytes)
 						return
