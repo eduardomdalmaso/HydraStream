@@ -1,0 +1,29 @@
+{
+  "folders": [
+    {
+      "name": "🛡️ Resolução Hikvision (RTSP Sanitizer)",
+      "path": "c:/Users/hades/Documents/resolucao_hikivision"
+    },
+    {
+      "name": "🌊 HydraStream (Data Plane & Rust Engine)",
+      "path": "c:/Users/hades/Documents/HydraStream"
+    },
+    {
+      "name": "🧠 ReductorPrompt (RAG & Knowledge CLI)",
+      "path": "c:/Users/hades/Documents/reductor-prompt"
+    }
+  ],
+  "settings": {
+    "python.defaultInterpreterPath": "C:/Users/hades/miniconda3/envs/reductor-prompt/python.exe",
+    "files.exclude": {
+      "**/.git": true,
+      "**/.svn": true,
+      "**/.hg": true,
+      "**/CVS": true,
+      "**/.DS_Store": true,
+      "**/Thumbs.db": true,
+      "**/__pycache__": true
+    },
+    "terminal.integrated.defaultProfile.windows": "PowerShell"
+  }
+}

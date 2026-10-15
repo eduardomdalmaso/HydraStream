@@ -16,6 +16,7 @@ fn print_usage() {
     println!("  hydra-engine probe --url <rtsp_url>");
     println!("  hydra-engine snapshot --url <rtsp_url> [--out <output_path>]");
     println!("  hydra-engine stream --url <rtsp_url>");
+    println!("  hydra-engine relay --source <rtsp_url> [--id <stream_id>] [--port 8554]");
     println!("  hydra-engine benchmark");
 }
 
@@ -289,6 +290,7 @@ fn main() {
         "probe" => hydra_engine::rtsp::cli::run_probe(&args[2..]),
         "snapshot" => hydra_engine::rtsp::cli::run_snapshot(&args[2..]),
         "stream" => hydra_engine::rtsp::cli::run_stream(&args[2..]),
+        "relay" => hydra_engine::rtsp::cli::run_relay(&args[2..]),
         "benchmark" => run_benchmark(),
         "--help" | "-h" | "help" => print_usage(),
         _ => {
