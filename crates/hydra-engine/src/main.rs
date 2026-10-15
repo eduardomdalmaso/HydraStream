@@ -13,6 +13,9 @@ fn print_usage() {
     println!("Usage:");
     println!("  hydra-engine server [--port 8085] [--rtmp-port 1935]");
     println!("  hydra-engine ingest --id <stream_id> [--width 1920] [--height 1080] [--format 1] [--slots 16]");
+    println!("  hydra-engine probe --url <rtsp_url>");
+    println!("  hydra-engine snapshot --url <rtsp_url> [--out <output_path>]");
+    println!("  hydra-engine stream --url <rtsp_url>");
     println!("  hydra-engine benchmark");
 }
 
@@ -283,6 +286,9 @@ fn main() {
     match args[1].as_str() {
         "server" => run_server(&args[2..]),
         "ingest" => run_ingest(&args[2..]),
+        "probe" => hydra_engine::rtsp::cli::run_probe(&args[2..]),
+        "snapshot" => hydra_engine::rtsp::cli::run_snapshot(&args[2..]),
+        "stream" => hydra_engine::rtsp::cli::run_stream(&args[2..]),
         "benchmark" => run_benchmark(),
         "--help" | "-h" | "help" => print_usage(),
         _ => {

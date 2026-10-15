@@ -15,6 +15,7 @@ pub mod wsp;
 pub mod transcode;
 pub mod server;
 pub mod rtmp;
+pub mod rtsp;
 
 pub use shm::{ShmWriter, ShmReader, ShmHeader, SlotHeader};
 pub use governor::FpsGovernor;

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"hydrastream/internal/adapters/secondary/proc"
+	"hydrastream/internal/adapters/secondary/rust"
 	"hydrastream/internal/domain"
 )
 
@@ -97,25 +97,6 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, st *domain
 		}
 	}
 
-	var urlsToTry []string
-	if sourceURL != "" && strings.HasPrefix(strings.ToLower(sourceURL), "rtsp://") && !strings.Contains(sourceURL, "localhost:") && !strings.Contains(sourceURL, "127.0.0.1:") {
-		var user, pass string
-		if u, errP := url.Parse(sourceURL); errP == nil && u.User != nil {
-			user = u.User.Username()
-			pass, _ = u.User.Password()
-		}
-		if proxyURL, cleanup, errProxy := startRTSPProxyServer(ctx, sourceURL, user, pass); errProxy == nil {
-			defer cleanup()
-			urlsToTry = append(urlsToTry, proxyURL)
-		}
-	}
-	if sourceURL != "" && !strings.Contains(sourceURL, "localhost:8554") {
-		urlsToTry = append(urlsToTry, sourceURL)
-	}
-	urlsToTry = append(urlsToTry,
-		fmt.Sprintf("rtsp://localhost:8554/%s", cleanID),
-	)
-
 	// Extract dynamic quality and fps from query params (?q=4&fps=20)
 	qParam := r.URL.Query().Get("q")
 	if qParam == "" || len(qParam) > 2 {
@@ -125,6 +106,48 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, st *domain
 	if fpsParam == "" || len(fpsParam) > 2 {
 		fpsParam = "20"
 	}
+
+	// Try HydraEngine Rust native RTSP pipe for external streams (resolves Hikvision/Dahua Digest quirks)
+	if sourceURL != "" && strings.HasPrefix(strings.ToLower(sourceURL), "rtsp://") && !strings.Contains(sourceURL, "localhost:") && !strings.Contains(sourceURL, "127.0.0.1:") {
+		pipeStdout, cleanup, errPipe := rust.SpawnStreamPipe(ctx, sourceURL)
+		if errPipe == nil {
+			defer cleanup()
+			defer pipeStdout.Close()
+
+			args := []string{
+				"-loglevel", "warning",
+				"-fflags", "nobuffer+discardcorrupt",
+				"-flags", "low_delay",
+				"-f", "hevc",
+				"-i", "-",
+				"-an",
+				"-threads", "2",
+				"-c:v", "mjpeg",
+				"-q:v", qParam,
+				"-r", fpsParam,
+				"-f", "mpjpeg",
+				"-boundary_tag", "ffmpeg",
+				"-",
+			}
+
+			cmd := exec.CommandContext(ctx, ffmpegBin, args...)
+			proc.SetHideWindow(cmd)
+			cmd.Stdin = pipeStdout
+			cmd.Stdout = w
+			cmd.Stderr = os.Stderr
+
+			if err := cmd.Run(); err == nil || ctx.Err() != nil {
+				return
+			}
+		}
+	}
+	var urlsToTry []string
+	if sourceURL != "" && !strings.Contains(sourceURL, "localhost:8554") {
+		urlsToTry = append(urlsToTry, sourceURL)
+	}
+	urlsToTry = append(urlsToTry,
+		fmt.Sprintf("rtsp://localhost:8554/%s", cleanID),
+	)
 
 	for {
 		select {

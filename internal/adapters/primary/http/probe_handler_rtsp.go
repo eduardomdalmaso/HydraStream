@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"hydrastream/internal/adapters/secondary/proc"
+	"hydrastream/internal/adapters/secondary/rust"
 	"hydrastream/internal/domain"
 )
 
@@ -200,33 +201,30 @@ func (h *Handler) probeRTSP(w http.ResponseWriter, req StreamProbeRequest) {
 		}
 	}
 
-	// Fallback: If FFmpeg failed (e.g. Hikvision Digest multi-header or OPTIONS 401 rejection), try native VLC-style RTSP probe
-	nativeRes, errNative := probeRTSPNative(targetURL, authUser, authPass, 5*time.Second)
-	if errNative == nil && nativeRes != nil && nativeRes.Online {
+	// Fallback: Delegate RTSP probing and snapshot to HydraEngine Rust (retina client)
+	if rustRes, errRust := rust.ProbeRTSPNativeRust(targetURL, 5*time.Second); errRust == nil && rustRes != nil && rustRes.Online {
 		var b64Snap string
-		if errProxy := captureSnapshotWithNativeDigestProxy(targetURL, authUser, authPass, tmpFile, 6*time.Second); errProxy == nil {
-			if data, errRead := os.ReadFile(tmpFile); errRead == nil && len(data) > 0 {
-				targetStreamID := req.StreamID
-				if targetStreamID == "" {
-					targetStreamID = req.CameraID
-				}
-				_ = os.MkdirAll("samples", 0755)
-				if targetStreamID != "" {
-					cleanID := filepath.Base(targetStreamID)
-					_ = os.WriteFile(filepath.Join("samples", fmt.Sprintf("%s.jpg", cleanID)), data, 0644)
-				}
-				_ = os.WriteFile(filepath.Join("samples", "latest_probe.jpg"), data, 0644)
-				_ = os.Remove(tmpFile)
-				b64Snap = "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(data)
+		if data, errSnap := rust.CaptureSnapshotNativeRust(targetURL, tmpFile, 6*time.Second); errSnap == nil && len(data) > 0 {
+			targetStreamID := req.StreamID
+			if targetStreamID == "" {
+				targetStreamID = req.CameraID
 			}
+			_ = os.MkdirAll("samples", 0755)
+			if targetStreamID != "" {
+				cleanID := filepath.Base(targetStreamID)
+				_ = os.WriteFile(filepath.Join("samples", fmt.Sprintf("%s.jpg", cleanID)), data, 0644)
+			}
+			_ = os.WriteFile(filepath.Join("samples", "latest_probe.jpg"), data, 0644)
+			_ = os.Remove(tmpFile)
+			b64Snap = "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(data)
 		}
 
 		resp := StreamProbeResponse{
 			Online:      true,
-			LatencyMs:   nativeRes.LatencyMs,
-			Codec:       nativeRes.Codec,
-			Resolution:  nativeRes.Resolution,
-			FPS:         nativeRes.FPS,
+			LatencyMs:   rustRes.LatencyMs,
+			Codec:       rustRes.Codec,
+			Resolution:  rustRes.Resolution,
+			FPS:         rustRes.FPS,
 			SnapshotURL: b64Snap,
 			RTSPURL:     targetURL,
 		}

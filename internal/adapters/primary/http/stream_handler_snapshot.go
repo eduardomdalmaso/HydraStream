@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"hydrastream/internal/adapters/secondary/proc"
+	"hydrastream/internal/adapters/secondary/rust"
 	"hydrastream/internal/domain"
 )
 
@@ -140,18 +141,11 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 		}
 	}
 
-	// 4. Try Native Digest Proxy (resolves Hikvision OPTIONS 401 bug)
+	// 4. Try HydraEngine Rust (retina client) to resolve camera Digest/OPTIONS quirks
 	if sourceURL != "" && strings.HasPrefix(strings.ToLower(sourceURL), "rtsp://") {
-		var user, pass string
-		if u, errParse := url.Parse(sourceURL); errParse == nil && u.User != nil {
-			user = u.User.Username()
-			pass, _ = u.User.Password()
-		}
-		if errProxy := captureSnapshotWithNativeDigestProxy(sourceURL, user, pass, samplePath, 6*time.Second); errProxy == nil {
-			if data, errRead := os.ReadFile(samplePath); errRead == nil && len(data) > 20000 {
-				_, _ = w.Write(data)
-				return
-			}
+		if data, errSnap := rust.CaptureSnapshotNativeRust(sourceURL, samplePath, 6*time.Second); errSnap == nil && len(data) > 20000 {
+			_, _ = w.Write(data)
+			return
 		}
 	}
 
