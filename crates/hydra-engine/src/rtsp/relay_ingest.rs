@@ -65,10 +65,24 @@ pub async fn run_relay_ingest(
         "".to_string()
     };
 
-    let _ = sdp_out.send(sdp);
+    // 3. SETUP - detecta trackID pelo SDP ou usa fallback trackID=video
+    let mut track_uri = format!("{}/trackID=video", uri.trim_end_matches('/'));
+    for line in sdp.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("a=control:") {
+            let ctrl = trimmed["a=control:".len()..].trim();
+            if ctrl != "*" && !ctrl.is_empty() {
+                if ctrl.starts_with("rtsp://") {
+                    track_uri = ctrl.to_string();
+                } else {
+                    track_uri = format!("{}/{}", uri.trim_end_matches('/'), ctrl.trim_start_matches('/'));
+                }
+                break;
+            }
+        }
+    }
 
-    // 3. SETUP trackID=video
-    let track_uri = format!("{}/trackID=video", uri.trim_end_matches('/'));
+    let _ = sdp_out.send(sdp);
     let req_setup = format!(
         "SETUP {} RTSP/1.0\r\nCSeq: 3\r\nUser-Agent: HydraStream\r\nTransport: RTP/AVP/TCP;unicast;interleaved=0-1\r\n\r\n",
         track_uri
