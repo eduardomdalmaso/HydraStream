@@ -110,8 +110,8 @@ func TestHardwareTelemetryEndpoint(t *testing.T) {
 	if hw.Host.CPUCores <= 0 {
 		t.Errorf("expected positive CPU cores, got %d", hw.Host.CPUCores)
 	}
-	if hw.SHM.MountPoint != "/dev/shm" {
-		t.Errorf("expected /dev/shm mount point, got %s", hw.SHM.MountPoint)
+	if hw.SHM.MountPoint != "/dev/shm" && hw.SHM.MountPoint != "Windows SharedMemory" {
+		t.Errorf("expected /dev/shm or Windows SharedMemory mount point, got %s", hw.SHM.MountPoint)
 	}
 }
 

@@ -71,6 +71,28 @@ func extractMediaInfoFromFFmpeg(outStr string) (codec string, resolution string,
 	return codec, resolution, fps
 }
 
+func detectHardwareFromRTSP(targetURL, outStr string) (brand, model string) {
+	targetLower := strings.ToLower(targetURL)
+	outLower := strings.ToLower(outStr)
+
+	switch {
+	case strings.Contains(targetLower, "/streaming/channels") || strings.Contains(outLower, "hikvision") || strings.Contains(outLower, "hik_"):
+		return "Hikvision", "IP Camera (Hikvision Protocol)"
+	case strings.Contains(targetLower, "cam/realmonitor") || strings.Contains(outLower, "dahua") || strings.Contains(outLower, "intelbras"):
+		return "Intelbras / Dahua", "IP Camera (Dahua Protocol)"
+	case strings.Contains(targetLower, "/stream1") || strings.Contains(targetLower, "/stream2") || strings.Contains(outLower, "tapo") || strings.Contains(outLower, "tp-link"):
+		return "TP-Link Tapo", "Tapo Smart Cam"
+	case strings.Contains(targetLower, "/h264preview") || strings.Contains(targetLower, "/h265preview") || strings.Contains(outLower, "reolink"):
+		return "Reolink", "Reolink IP Camera"
+	case strings.Contains(targetLower, "axis-media") || strings.Contains(outLower, "axis"):
+		return "Axis Communications", "Axis Network Camera"
+	case strings.Contains(outLower, "live555"):
+		return "Generic RTSP", "LIVE555 Streaming Server"
+	default:
+		return "Generic RTSP", "Network Video Device"
+	}
+}
+
 func (h *Handler) probeRTSP(w http.ResponseWriter, req StreamProbeRequest) {
 	targetURL := req.URL
 	ip := req.IPAddress
@@ -128,18 +150,13 @@ func (h *Handler) probeRTSP(w http.ResponseWriter, req StreamProbeRequest) {
 	}()
 
 	if req.Username != "" && !strings.Contains(targetURL, "@") {
-		auth := fmt.Sprintf("%s:%s@", url.QueryEscape(req.Username), url.QueryEscape(req.Password))
+		auth := fmt.Sprintf("%s:%s@", req.Username, req.Password)
 		targetURL = strings.Replace(targetURL, "rtsp://", "rtsp://"+auth, 1)
 	}
+	targetURL = strings.Replace(targetURL, "%24", "$", -1)
 
 	start := time.Now()
-	ffmpegBin := proc.GetFFmpegPath()
 	tmpFile := filepath.Join("samples", fmt.Sprintf("probe_%d.jpg", time.Now().UnixNano()))
-	snapCmd := exec.Command(ffmpegBin, "-rtsp_transport", "tcp", "-timeout", "5000000",
-		"-i", targetURL, "-update", "1", "-frames:v", "1", "-q:v", "2", "-y", tmpFile)
-	proc.SetHideWindow(snapCmd)
-	out, errCmd := snapCmd.CombinedOutput()
-	outStr := string(out)
 
 	var onvifDev *domain.ONVIFDevice
 	select {
@@ -148,63 +165,10 @@ func (h *Handler) probeRTSP(w http.ResponseWriter, req StreamProbeRequest) {
 	case <-time.After(1 * time.Second):
 	}
 
-	if errCmd == nil {
-		if data, errRead := os.ReadFile(tmpFile); errRead == nil && len(data) > 0 {
-			targetStreamID := req.StreamID
-			if targetStreamID == "" {
-				targetStreamID = req.CameraID
-			}
-			_ = os.MkdirAll("samples", 0755)
-			if targetStreamID != "" {
-				cleanID := filepath.Base(targetStreamID)
-				_ = os.WriteFile(filepath.Join("samples", fmt.Sprintf("%s.jpg", cleanID)), data, 0644)
-			}
-			_ = os.WriteFile(filepath.Join("samples", "latest_probe.jpg"), data, 0644)
-			_ = os.Remove(tmpFile)
-			b64 := "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(data)
-			codec, res, fps := extractMediaInfoFromFFmpeg(outStr)
-
-			resp := StreamProbeResponse{
-				Online:      true,
-				LatencyMs:   time.Since(start).Milliseconds(),
-				Codec:       codec,
-				Resolution:  res,
-				FPS:         fps,
-				SnapshotURL: b64,
-				RTSPURL:     targetURL,
-			}
-
-			if onvifDev != nil {
-				resp.ONVIFAvailable = true
-				resp.ONVIFPort = onvifDev.Port
-				if resp.Manufacturer == "" {
-					resp.Manufacturer = onvifDev.Manufacturer
-				}
-				if resp.Model == "" {
-					resp.Model = onvifDev.Model
-				}
-				resp.Firmware = onvifDev.FirmwareVersion
-				resp.SerialNumber = onvifDev.SerialNumber
-
-				for _, prof := range onvifDev.Profiles {
-					resp.Profiles = append(resp.Profiles, fmt.Sprintf("%s (%dx%d @ %d FPS)", prof.Name, prof.Width, prof.Height, prof.FPS))
-					if strings.Contains(strings.ToLower(prof.Name), "sub") || (prof.Width > 0 && prof.Width <= 1280 && prof.Width < 1920) {
-						if resp.SubstreamURL == "" && prof.RTSPStream != "" {
-							resp.SubstreamURL = prof.RTSPStream
-						}
-					}
-				}
-			}
-
-			_ = json.NewEncoder(w).Encode(resp)
-			return
-		}
-	}
-
-	// Fallback: Delegate RTSP probing and snapshot to HydraEngine Rust (retina client)
-	if rustRes, errRust := rust.ProbeRTSPNativeRust(targetURL, 5*time.Second); errRust == nil && rustRes != nil && rustRes.Online {
+	// Priority 1: High-Performance Native Rust Retina Client (Fast Digest MD5/SHA-256 Auth, ~60ms)
+	if rustRes, errRust := rust.ProbeRTSPNativeRust(targetURL, 3*time.Second); errRust == nil && rustRes != nil && rustRes.Online {
 		var b64Snap string
-		if data, errSnap := rust.CaptureSnapshotNativeRust(targetURL, tmpFile, 6*time.Second); errSnap == nil && len(data) > 0 {
+		if data, errSnap := rust.CaptureSnapshotNativeRust(targetURL, tmpFile, 4*time.Second); errSnap == nil && len(data) > 0 {
 			targetStreamID := req.StreamID
 			if targetStreamID == "" {
 				targetStreamID = req.CameraID
@@ -240,8 +204,64 @@ func (h *Handler) probeRTSP(w http.ResponseWriter, req StreamProbeRequest) {
 			resp.Firmware = onvifDev.FirmwareVersion
 			resp.SerialNumber = onvifDev.SerialNumber
 		}
+		if resp.Manufacturer == "" {
+			resp.Manufacturer, resp.Model = detectHardwareFromRTSP(targetURL, "")
+		}
 		_ = json.NewEncoder(w).Encode(resp)
 		return
+	}
+
+	// Priority 2: FFmpeg Fallback
+	ffmpegBin := proc.GetFFmpegPath()
+	snapCmd := exec.Command(ffmpegBin, "-rtsp_transport", "tcp", "-timeout", "4000000",
+		"-i", targetURL, "-update", "1", "-frames:v", "1", "-q:v", "2", "-y", tmpFile)
+	proc.SetHideWindow(snapCmd)
+	out, errCmd := snapCmd.CombinedOutput()
+	outStr := string(out)
+
+	if errCmd == nil {
+		if data, errRead := os.ReadFile(tmpFile); errRead == nil && len(data) > 0 {
+			targetStreamID := req.StreamID
+			if targetStreamID == "" {
+				targetStreamID = req.CameraID
+			}
+			_ = os.MkdirAll("samples", 0755)
+			if targetStreamID != "" {
+				cleanID := filepath.Base(targetStreamID)
+				_ = os.WriteFile(filepath.Join("samples", fmt.Sprintf("%s.jpg", cleanID)), data, 0644)
+			}
+			_ = os.WriteFile(filepath.Join("samples", "latest_probe.jpg"), data, 0644)
+			_ = os.Remove(tmpFile)
+			b64 := "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(data)
+			codec, res, fps := extractMediaInfoFromFFmpeg(outStr)
+
+			resp := StreamProbeResponse{
+				Online:      true,
+				LatencyMs:   time.Since(start).Milliseconds(),
+				Codec:       codec,
+				Resolution:  res,
+				FPS:         fps,
+				SnapshotURL: b64,
+				RTSPURL:     targetURL,
+			}
+			if onvifDev != nil {
+				resp.ONVIFAvailable = true
+				resp.ONVIFPort = onvifDev.Port
+				if resp.Manufacturer == "" {
+					resp.Manufacturer = onvifDev.Manufacturer
+				}
+				if resp.Model == "" {
+					resp.Model = onvifDev.Model
+				}
+				resp.Firmware = onvifDev.FirmwareVersion
+				resp.SerialNumber = onvifDev.SerialNumber
+			}
+			if resp.Manufacturer == "" {
+				resp.Manufacturer, resp.Model = detectHardwareFromRTSP(targetURL, outStr)
+			}
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
 	}
 
 	latency := time.Since(start).Milliseconds()

@@ -26,6 +26,7 @@ func main() {
 	log.SetOutput(io.MultiWriter(os.Stdout, ringLogger))
 
 	log.Println("[HydraStream] Initializing Data Plane Engine (Hexagonal Architecture + DDD)...")
+	httpAdapter.StopAllH264Bridges()
 
 	hw := gpu.DetectHardware()
 
@@ -86,6 +87,7 @@ func main() {
 	<-quit
 
 	log.Println("🛑 [HydraStream] Shutting down Data Plane gracefully...")
+	httpAdapter.StopAllH264Bridges()
 	if natsPub != nil {
 		natsPub.Close()
 	}

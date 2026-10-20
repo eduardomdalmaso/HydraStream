@@ -56,48 +56,17 @@ impl StreamRegistry {
         self.streams.write().remove(stream_id);
     }
 
+    pub fn unregister_if_gateway_matches(&self, stream_id: &str, gateway: &Arc<AsyncStreamGateway>) {
+        let mut map = self.streams.write();
+        if let Some(entry) = map.get(stream_id) {
+            if Arc::ptr_eq(&entry.gateway, gateway) {
+                map.remove(stream_id);
+            }
+        }
+    }
+
     pub fn get(&self, stream_id: &str) -> Option<Arc<StreamEntry>> {
-        if let Some(entry) = self.streams.read().get(stream_id).cloned() {
-            return Some(entry);
-        }
-
-        // Auto-attach to active POSIX SHM buffer if available
-        if let Ok(mut reader) = crate::shm::ShmReader::open(stream_id) {
-            println!("⚡ [Hydra WSP] Auto-attaching to SHM buffer for stream '{}'", stream_id);
-            let hub = Arc::new(crate::transport::BroadcastHub::new(16));
-            let gateway = Arc::new(AsyncStreamGateway::new(hub, 32));
-            let gw_clone = gateway.clone();
-            let sid = stream_id.to_string();
-
-            tokio::task::spawn_blocking(move || {
-                let mut buf = Vec::new();
-                while gw_clone.is_running() {
-                    match reader.wait_and_read_frame(&mut buf, Some(std::time::Duration::from_millis(500))) {
-                        Ok(Some(meta)) => {
-                            let flags = crate::codec::NalParser::classify_frame_flags(&buf, false);
-                            let payload = crate::transport::FramePayload::new_host(
-                                meta.sequence,
-                                meta.timestamp_us,
-                                reader.header().width,
-                                reader.header().height,
-                                flags,
-                                BIT_WEBSOCKET,
-                                buf.clone(),
-                            );
-                            let _ = gw_clone.dispatch_frame(payload, flags);
-                        }
-                        Ok(None) => {}
-                        Err(_) => break,
-                    }
-                }
-                println!("🛑 [Hydra WSP] Detached SHM reader bridge for '{}'", sid);
-            });
-
-            self.register(stream_id, StreamCodec::H264, gateway);
-            return self.streams.read().get(stream_id).cloned();
-        }
-
-        None
+        self.streams.read().get(stream_id).cloned()
     }
 
     pub fn transcode_pool(&self) -> Arc<TranscodePool> {
@@ -157,45 +126,23 @@ impl WspServer {
     }
 }
 
-/// Parses path: /live/{stream_id} or /api/v1/streams/{stream_id}/live
 fn parse_stream_path(uri: &str) -> Option<String> {
-    let path = uri.split('?').next().unwrap_or(uri);
-    let parts: Vec<&str> = path.trim_matches('/').split('/').collect();
-
-    if parts.is_empty() {
-        return None;
-    }
-
-    // Pattern 1: /live/{stream_id}
-    if parts.len() >= 2 && parts[0] == "live" {
-        return Some(parts[1].to_string());
-    }
-
-    // Pattern 2: /api/v1/streams/{stream_id}/live or /api/v1/streams/{stream_id}
+    let path = uri.split('?').next().unwrap_or(uri).trim_matches('/');
+    let parts: Vec<&str> = path.split('/').collect();
+    if parts.is_empty() || parts[0].is_empty() { return None; }
+    if parts.len() >= 2 && parts[0] == "live" { return Some(parts[1].to_string()); }
     if parts.len() >= 4 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "streams" {
         return Some(parts[3].to_string());
     }
-
-    // Pattern 3: direct /{stream_id}
-    if parts.len() == 1 && !parts[0].is_empty() {
-        return Some(parts[0].to_string());
-    }
-
+    if parts.len() == 1 { return Some(parts[0].to_string()); }
     None
 }
 
-/// Extracts query parameter: codec=h264, codec=raw, etc.
 fn parse_query_param(uri: &str, param: &str) -> Option<String> {
-    let query = uri.split('?').nth(1)?;
-    for pair in query.split('&') {
+    uri.split('?').nth(1)?.split('&').find_map(|pair| {
         let mut kv = pair.split('=');
-        if let (Some(k), Some(v)) = (kv.next(), kv.next()) {
-            if k == param {
-                return Some(v.to_string());
-            }
-        }
-    }
-    None
+        if kv.next()? == param { Some(kv.next()?.to_string()) } else { None }
+    })
 }
 
 pub async fn handle_connection(
@@ -205,7 +152,6 @@ pub async fn handle_connection(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut requested_uri = String::new();
 
-    // Custom handshake callback to inspect URI and query parameters
     let callback = |req: &Request, resp: Response| {
         requested_uri = req.uri().to_string();
         Ok(resp)
@@ -229,16 +175,21 @@ pub async fn handle_connection(
 
     let target_stream_id = if requested_profile == "sub" {
         let sub_id = format!("{}_sub", stream_id);
-        if registry.get(&sub_id).is_some() {
-            sub_id
-        } else {
-            stream_id.clone()
-        }
+        if registry.get(&sub_id).is_some() { sub_id } else { stream_id.clone() }
     } else {
         stream_id.clone()
     };
 
-    let stream_entry = match registry.get(&target_stream_id) {
+    let mut stream_entry = None;
+    for _ in 0..40 {
+        if let Some(e) = registry.get(&target_stream_id) {
+            stream_entry = Some(e);
+            break;
+        }
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    }
+
+    let stream_entry = match stream_entry {
         Some(e) => e,
         None => {
             let _ = ws_tx.send(Message::Text(format!(r#"{{"error":"stream_not_found","stream_id":"{}"}}"#, target_stream_id))).await;

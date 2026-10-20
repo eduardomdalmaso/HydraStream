@@ -35,7 +35,7 @@ pub async fn run_stream_pipe(raw_url: &str) -> Result<(), Box<dyn std::error::Er
     let playing = session.play(retina::client::PlayOptions::default()).await?;
     let mut demuxed = playing.demuxed()?;
 
-    let mut stdout = std::io::stdout();
+    let mut stdout = std::io::BufWriter::with_capacity(32768, std::io::stdout());
     let mut started = false;
     while let Some(item_res) = demuxed.next().await {
         if let Ok(retina::codec::CodecItem::VideoFrame(frame)) = item_res {

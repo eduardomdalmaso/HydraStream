@@ -119,7 +119,10 @@ pub fn handle_video_message(
         }
 
         state.frame_seq += 1;
-        let now_us = (Instant::now().elapsed().as_micros()) as u64;
+        let now_us = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_micros() as u64)
+            .unwrap_or(0);
 
         if let Some(ref mut writer) = state.shm_writer {
             let _ = writer.write_frame(now_us, &annexb_frame);

@@ -119,6 +119,14 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 		}
 	}
 
+	// 3.5 Try HydraEngine Rust (retina client) first to resolve camera Digest/OPTIONS quirks immediately (<500ms)
+	if sourceURL != "" && strings.HasPrefix(strings.ToLower(sourceURL), "rtsp://") && !strings.Contains(sourceURL, "localhost:") && !strings.Contains(sourceURL, "127.0.0.1:") {
+		if data, errSnap := rust.CaptureSnapshotNativeRust(sourceURL, samplePath, 6*time.Second); errSnap == nil && len(data) > 20000 {
+			_, _ = w.Write(data)
+			return
+		}
+	}
+
 	var urlsToTry []string
 	if sourceURL != "" && !strings.Contains(sourceURL, "localhost:8554") {
 		urlsToTry = append(urlsToTry, sourceURL)
@@ -138,14 +146,6 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request, streamI
 				_, _ = w.Write(data)
 				return
 			}
-		}
-	}
-
-	// 4. Try HydraEngine Rust (retina client) to resolve camera Digest/OPTIONS quirks
-	if sourceURL != "" && strings.HasPrefix(strings.ToLower(sourceURL), "rtsp://") {
-		if data, errSnap := rust.CaptureSnapshotNativeRust(sourceURL, samplePath, 6*time.Second); errSnap == nil && len(data) > 20000 {
-			_, _ = w.Write(data)
-			return
 		}
 	}
 

@@ -131,7 +131,11 @@ pub async fn handle_rtmp_connection(
 
     if !stream_id_resolved.is_empty() {
         println!("🛑 [Hydra RTMP] Publisher disconnected from '{}' ({})", stream_id_resolved, peer_addr);
-        registry.unregister(&stream_id_resolved);
+        if let Some(ref gw) = state.gateway {
+            registry.unregister_if_gateway_matches(&stream_id_resolved, gw);
+        } else {
+            registry.unregister(&stream_id_resolved);
+        }
     }
     Ok(())
 }

@@ -33,7 +33,7 @@ func syncCamerasFromDB(svc *application.StreamService) {
 		return
 	}
 
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
 	syncOnce := func() {
@@ -44,6 +44,7 @@ func syncCamerasFromDB(svc *application.StreamService) {
 			return
 		}
 
+		activeDBIDs := make(map[string]bool)
 		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 		for _, line := range lines {
 			parts := strings.Split(line, "|")
@@ -60,6 +61,7 @@ func syncCamerasFromDB(svc *application.StreamService) {
 			if id == "" || rtspURL == "" {
 				continue
 			}
+			activeDBIDs[id] = true
 
 			_ = svc.RegisterStream(context.Background(), &domain.Stream{
 				TenantID:       "default",
@@ -70,6 +72,16 @@ func syncCamerasFromDB(svc *application.StreamService) {
 				Status:         "active",
 				IngestFPS:      25.0,
 			})
+		}
+
+		// Purge deleted streams from HydraStream memory and ingest
+		existingStreams, _, errList := svc.ListStreams(context.Background(), "", "", "", 1, 500)
+		if errList == nil {
+			for _, st := range existingStreams {
+				if st.StreamID != "cam_entrance_01" && !activeDBIDs[st.StreamID] {
+					_ = svc.DeleteStream(context.Background(), st.StreamID)
+				}
+			}
 		}
 	}
 

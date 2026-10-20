@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,25 +13,70 @@ import (
 	"time"
 
 	"hydrastream/internal/adapters/secondary/proc"
+	"hydrastream/internal/adapters/secondary/rust"
 )
 
 var (
 	h264BridgeMu sync.Mutex
-	h264Bridges   = make(map[string]*exec.Cmd)
+	h264Bridges  = make(map[string]*exec.Cmd)
+	h264Pipes    = make(map[string]func())
+	h264Starting = make(map[string]chan struct{})
+	nvencOnce    sync.Once
+	nvencAvail   bool
 )
+
+func killOrphanFFmpegForStream(cleanID string) {
+	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command",
+		fmt.Sprintf("Get-CimInstance Win32_Process -Filter \"Name = 'ffmpeg.exe'\" | Where-Object { $_.CommandLine -like '*1935/live/%s*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }", cleanID))
+	proc.SetHideWindow(cmd)
+	_ = cmd.Run()
+}
+
+// StopAllH264Bridges stops all running FFmpeg bridge processes
+func StopAllH264Bridges() {
+	h264BridgeMu.Lock()
+	defer h264BridgeMu.Unlock()
+	for id, clean := range h264Pipes {
+		if clean != nil {
+			clean()
+		}
+		delete(h264Pipes, id)
+	}
+	for id, cmd := range h264Bridges {
+		if cmd != nil && cmd.Process != nil {
+			_ = cmd.Process.Kill()
+		}
+		delete(h264Bridges, id)
+	}
+}
+
+func isNVENCAvailable() bool {
+	nvencOnce.Do(func() {
+		cmd := exec.Command(proc.GetFFmpegPath(), "-f", "lavfi", "-i", "nullsrc=s=256x256:d=0.04", "-c:v", "h264_nvenc", "-f", "null", "-")
+		proc.SetHideWindow(cmd)
+		if err := cmd.Run(); err == nil {
+			nvencAvail = true
+		}
+	})
+	return nvencAvail
+}
 
 func stopH264BridgeInternal(streamID string) {
 	h264BridgeMu.Lock()
 	defer h264BridgeMu.Unlock()
 	cleanID := filepath.Base(streamID)
-	baseID := strings.TrimSuffix(cleanID, "_sub")
 
-	for _, id := range []string{streamID, cleanID, baseID} {
+	for _, id := range []string{streamID, cleanID} {
+		if clean, has := h264Pipes[id]; has && clean != nil {
+			clean()
+			delete(h264Pipes, id)
+		}
 		if cmd, exists := h264Bridges[id]; exists && cmd != nil && cmd.Process != nil {
 			_ = cmd.Process.Kill()
 			delete(h264Bridges, id)
 		}
 	}
+	killOrphanFFmpegForStream(cleanID)
 }
 
 func (h *Handler) handleH264BridgeStart(w http.ResponseWriter, r *http.Request, streamID string) {
@@ -40,19 +86,33 @@ func (h *Handler) handleH264BridgeStart(w http.ResponseWriter, r *http.Request, 
 	cleanID := filepath.Base(streamID)
 	baseID := strings.TrimSuffix(cleanID, "_sub")
 
-	// Terminate any active MJPEG readers for this camera to free the RTSP socket
-	stopMJPEGInternal(cleanID)
-	stopMJPEGInternal(baseID)
-	time.Sleep(150 * time.Millisecond)
-
 	h264BridgeMu.Lock()
-	if cmd, running := h264Bridges[streamID]; running && cmd != nil && cmd.Process != nil {
+	if cmd, running := h264Bridges[cleanID]; running && cmd != nil && cmd.Process != nil {
 		h264BridgeMu.Unlock()
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "already_running", "stream_id": streamID})
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "already_running", "stream_id": cleanID})
 		return
 	}
+	if ch, starting := h264Starting[cleanID]; starting {
+		h264BridgeMu.Unlock()
+		<-ch
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "already_running", "stream_id": cleanID})
+		return
+	}
+	startCh := make(chan struct{})
+	h264Starting[cleanID] = startCh
 	h264BridgeMu.Unlock()
+
+	defer func() {
+		h264BridgeMu.Lock()
+		delete(h264Starting, cleanID)
+		close(startCh)
+		h264BridgeMu.Unlock()
+	}()
+
+	// Terminate any active MJPEG readers for this stream to free the RTSP socket
+	stopMJPEGInternal(cleanID)
 
 	sourceURL := ""
 
@@ -89,58 +149,110 @@ func (h *Handler) handleH264BridgeStart(w http.ResponseWriter, r *http.Request, 
 
 	rtmpPort := os.Getenv("RTMP_PORT")
 	if rtmpPort == "" {
-		rtmpPort = "1936"
+		rtmpPort = "1935"
 	}
 	targetRTMP := fmt.Sprintf("rtmp://127.0.0.1:%s/live/%s", rtmpPort, cleanID)
 	ffmpegBin := proc.GetFFmpegPath()
 
-	_ = os.MkdirAll("samples", 0755)
-	samplePath := filepath.Clean(filepath.Join("samples", fmt.Sprintf("%s.jpg", cleanID)))
 
-	args := []string{
-		"-loglevel", "warning",
-		"-fflags", "+genpts",
-		"-avoid_negative_ts", "make_zero",
-		"-rtsp_transport", "tcp",
-		"-i", sourceURL,
-		"-c:v", "copy",
-		"-an",
-		"-f", "flv",
-		targetRTMP,
-		"-map", "0:v",
-		"-vf", "fps=1",
-		"-update", "1",
-		"-y", samplePath,
+
+	var cmd *exec.Cmd
+	var pipeCleanup func()
+
+	codecFormat := "h264"
+	videoArgs := []string{"-c:v", "copy"}
+	if strings.HasSuffix(cleanID, "_sub") || (st != nil && (strings.EqualFold(st.Codec, "h265") || strings.EqualFold(st.Codec, "hevc"))) {
+		codecFormat = "hevc"
+		if isNVENCAvailable() {
+			videoArgs = []string{
+				"-c:v", "h264_nvenc",
+				"-preset", "p1",
+				"-tune", "ull",
+				"-zerolatency", "1",
+				"-profile:v", "baseline",
+				"-level", "3.1",
+				"-bf", "0",
+				"-forced-idr", "1",
+				"-g", "25",
+				"-b:v", "1000k",
+				"-maxrate", "1500k",
+				"-bufsize", "500k",
+			}
+		} else {
+			videoArgs = []string{"-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-profile:v", "baseline", "-level", "3.1", "-bf", "0", "-g", "25", "-threads", "2"}
+		}
 	}
 
-	cmd := exec.Command(ffmpegBin, args...)
-	proc.SetHideWindow(cmd)
+	baseFlags := []string{
+		"-loglevel", "warning",
+		"-probesize", "32768",
+		"-analyzeduration", "0",
+		"-fflags", "nobuffer+fastseek+genpts",
+		"-flags", "low_delay",
+		"-avoid_negative_ts", "make_zero",
+	}
+
+	killOrphanFFmpegForStream(cleanID)
+
+	if strings.HasPrefix(strings.ToLower(sourceURL), "rtsp://") && !strings.Contains(sourceURL, "localhost:") && !strings.Contains(sourceURL, "127.0.0.1:") {
+		pipeStdout, cleanup, errPipe := rust.SpawnStreamPipe(context.Background(), sourceURL)
+		if errPipe == nil {
+			pipeCleanup = cleanup
+			args := append(append(baseFlags, "-f", codecFormat, "-i", "-"), videoArgs...)
+			args = append(args, "-an", "-f", "flv", targetRTMP)
+			cmd = exec.Command(ffmpegBin, args...)
+			proc.SetHideWindow(cmd)
+			cmd.Stdin = pipeStdout
+		}
+	}
+
+	if cmd == nil {
+		args := append(append(baseFlags, "-rtsp_transport", "tcp", "-i", sourceURL), videoArgs...)
+		args = append(args, "-an", "-f", "flv", targetRTMP)
+		cmd = exec.Command(ffmpegBin, args...)
+		proc.SetHideWindow(cmd)
+	}
 
 	if err := cmd.Start(); err != nil {
+		if pipeCleanup != nil {
+			pipeCleanup()
+		}
 		http.Error(w, fmt.Sprintf(`{"error":"failed to start h264 bridge: %s"}`, err.Error()), http.StatusInternalServerError)
 		return
 	}
 
 	h264BridgeMu.Lock()
-	h264Bridges[streamID] = cmd
+	h264Bridges[cleanID] = cmd
+	if pipeCleanup != nil {
+		h264Pipes[cleanID] = pipeCleanup
+	}
 	h264BridgeMu.Unlock()
 
 	go func() {
 		_ = cmd.Wait()
+		if pipeCleanup != nil {
+			pipeCleanup()
+		}
 		h264BridgeMu.Lock()
-		if cur, ok := h264Bridges[streamID]; ok && cur == cmd {
-			delete(h264Bridges, streamID)
+		if cur, ok := h264Bridges[cleanID]; ok && cur == cmd {
+			delete(h264Bridges, cleanID)
+			delete(h264Pipes, cleanID)
 		}
 		h264BridgeMu.Unlock()
 	}()
 
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(150 * time.Millisecond)
+
+	wspPort := os.Getenv("WSP_PORT")
+	if wspPort == "" {
+		wspPort = "8085"
+	}
 
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":    "started",
 		"stream_id": streamID,
-		"wsp_url":   fmt.Sprintf("ws://%s:%s/live/%s", getHostForPublish(r), "8086", cleanID),
+		"wsp_url":   fmt.Sprintf("ws://%s:%s/live/%s", getHostForPublish(r), wspPort, cleanID),
 	})
 }
 
@@ -158,8 +270,7 @@ func isH264BridgeActive(streamID string) bool {
 	h264BridgeMu.Lock()
 	defer h264BridgeMu.Unlock()
 	cleanID := filepath.Base(streamID)
-	baseID := strings.TrimSuffix(cleanID, "_sub")
-	for _, id := range []string{streamID, cleanID, baseID} {
+	for _, id := range []string{streamID, cleanID} {
 		if cmd, ok := h264Bridges[id]; ok && cmd != nil && cmd.Process != nil {
 			return true
 		}

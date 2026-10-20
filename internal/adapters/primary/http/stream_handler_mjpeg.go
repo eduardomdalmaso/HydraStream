@@ -52,9 +52,8 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, st *domain
 	baseID := strings.TrimSuffix(cleanID, "_sub")
 	ffmpegBin := proc.GetFFmpegPath()
 
-	// Terminate any running H264 bridge for this camera so RTSP socket is freed
+	// Terminate any running H264 bridge for this specific stream so RTSP socket is freed
 	stopH264BridgeInternal(cleanID)
-	stopH264BridgeInternal(baseID)
 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -114,11 +113,19 @@ func (h *Handler) handleMJPEG(w http.ResponseWriter, r *http.Request, st *domain
 			defer cleanup()
 			defer pipeStdout.Close()
 
+			codecFormat := "h264"
+			if strings.HasSuffix(cleanID, "_sub") || (st != nil && (strings.EqualFold(st.Codec, "h265") || strings.EqualFold(st.Codec, "hevc"))) {
+				codecFormat = "hevc"
+			}
+
 			args := []string{
 				"-loglevel", "warning",
+				"-probesize", "32768",
+				"-analyzeduration", "0",
 				"-fflags", "nobuffer+discardcorrupt",
 				"-flags", "low_delay",
-				"-f", "hevc",
+				"-avoid_negative_ts", "make_zero",
+				"-f", codecFormat,
 				"-i", "-",
 				"-an",
 				"-threads", "2",

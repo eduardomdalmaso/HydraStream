@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+
+	"hydrastream/internal/adapters/secondary/proc"
 )
 
 func isPortInUse(port string) bool {
@@ -47,6 +49,7 @@ func buildOrFindRustEngine() string {
 
 	log.Println("🔨 [HydraStream] Rust hydra-engine binary not found. Compiling via cargo...")
 	buildCmd := exec.Command("cargo", "build", "--release", "--manifest-path", "crates/hydra-engine/Cargo.toml")
+	proc.SetHideWindow(buildCmd)
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
 	if err := buildCmd.Run(); err != nil {
@@ -93,6 +96,7 @@ func startEmbeddedWspEngine() *exec.Cmd {
 	}
 
 	cmd := exec.Command(binPath, "server", "--port", port, "--rtmp-port", rtmpPort)
+	proc.SetHideWindow(cmd)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
